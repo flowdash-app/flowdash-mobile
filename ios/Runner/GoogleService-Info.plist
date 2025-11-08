@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>CLIENT_ID</key>
+	<string>463589212979-hkkl6la94lvt53ejdgh01lnji4s682hl.apps.googleusercontent.com</string>
+	<key>REVERSED_CLIENT_ID</key>
+	<string>com.googleusercontent.apps.463589212979-hkkl6la94lvt53ejdgh01lnji4s682hl</string>
+	<key>API_KEY</key>
+	<string>AIzaSyBaTH2LEjVsA8Gz2OXih2SVOcd3fRG7JhE</string>
+	<key>GCM_SENDER_ID</key>
+	<string>463589212979</string>
+	<key>PLIST_VERSION</key>
+	<string>1</string>
+	<key>BUNDLE_ID</key>
+	<string>com.flowdash.mobile</string>
+	<key>PROJECT_ID</key>
+	<string>flowdash-dev</string>
+	<key>STORAGE_BUCKET</key>
+	<string>flowdash-dev.firebasestorage.app</string>
+	<key>IS_ADS_ENABLED</key>
+	<false></false>
+	<key>IS_ANALYTICS_ENABLED</key>
+	<false></false>
+	<key>IS_APPINVITE_ENABLED</key>
+	<true></true>
+	<key>IS_GCM_ENABLED</key>
+	<true></true>
+	<key>IS_SIGNIN_ENABLED</key>
+	<true></true>
+	<key>GOOGLE_APP_ID</key>
+	<string>1:463589212979:ios:bb43c2377c845648f3f446</string>
+</dict>
+</plist>
