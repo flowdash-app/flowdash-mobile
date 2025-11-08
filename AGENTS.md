@@ -583,7 +583,7 @@ Widget build(BuildContext context, GoRouterState state) {
 ### Base URL Configuration
 
 ```dart
-_dio.options.baseUrl = 'https://api.flowdash.app';
+_dio.options.baseUrl = 'https://api.flow-dash.com';
 _dio.options.connectTimeout = const Duration(seconds: 30);
 _dio.options.receiveTimeout = const Duration(seconds: 30);
 ```

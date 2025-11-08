@@ -197,14 +197,17 @@ npm install -g firebase-tools
 
 #### c. Install FlutterFire CLI
 
-```bash
-dart pub global activate flutterfire_cli
-```
+FlutterFire CLI is already included as a dev dependency in `pubspec.yaml`. No global installation needed!
 
 #### d. Configure Firebase
 
 ```bash
-flutterfire configure
+# Run FlutterFire CLI using dart run
+dart run flutterfire_cli:flutterfire configure
+
+# Or create an alias for convenience (optional)
+# Add to ~/.zshrc or ~/.bashrc:
+# alias flutterfire="dart run flutterfire_cli:flutterfire"
 ```
 
 ### 2. Firebase Analytics, Crashlytics, and Performance Setup
@@ -674,7 +677,7 @@ class ApiClient {
   ApiClient() : _dio = Dio() {
     _logger.info('ApiClient: Initializing');
     
-    _dio.options.baseUrl = 'https://api.flowdash.app'; // Update with actual URL
+    _dio.options.baseUrl = 'https://api.flow-dash.com';
     _dio.options.connectTimeout = const Duration(seconds: 30);
     _dio.options.receiveTimeout = const Duration(seconds: 30);
     
