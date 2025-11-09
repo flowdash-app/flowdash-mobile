@@ -7,7 +7,8 @@ class AuthInterceptor extends Interceptor {
   AuthInterceptor(this._authRepository);
 
   @override
-  void onRequest(RequestOptions options, RequestInterceptorHandler handler) async {
+  void onRequest(
+      RequestOptions options, RequestInterceptorHandler handler) async {
     final token = await _authRepository.getAuthToken();
 
     if (token != null) {

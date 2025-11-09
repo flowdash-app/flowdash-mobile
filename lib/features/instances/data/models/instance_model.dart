@@ -9,7 +9,7 @@ class InstanceModel extends Instance {
     super.lastConnectedAt,
     super.createdAt,
   });
-  
+
   factory InstanceModel.fromJson(Map<String, dynamic> json) {
     return InstanceModel(
       id: json['id'] as String,
@@ -24,18 +24,19 @@ class InstanceModel extends Instance {
           : null,
     );
   }
-  
+
   Map<String, dynamic> toJson() {
     return {
       'id': id,
       'name': name,
       'url': url,
       'active': active,
-      if (lastConnectedAt != null) 'lastConnectedAt': lastConnectedAt!.toIso8601String(),
+      if (lastConnectedAt != null)
+        'lastConnectedAt': lastConnectedAt!.toIso8601String(),
       if (createdAt != null) 'createdAt': createdAt!.toIso8601String(),
     };
   }
-  
+
   @override
   InstanceModel copyWith({
     String? id,
@@ -55,4 +56,3 @@ class InstanceModel extends Instance {
     );
   }
 }
-

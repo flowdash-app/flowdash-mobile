@@ -57,7 +57,9 @@ class _InstancesPageState extends ConsumerState<InstancesPage> {
                             Text(
                               instance.active ? 'Active' : 'Inactive',
                               style: TextStyle(
-                                color: instance.active ? Colors.green : Colors.grey,
+                                color: instance.active
+                                    ? Colors.green
+                                    : Colors.grey,
                                 fontWeight: FontWeight.bold,
                               ),
                             ),
@@ -66,9 +68,11 @@ class _InstancesPageState extends ConsumerState<InstancesPage> {
                         trailing: Switch(
                           value: instance.active,
                           onChanged: (value) async {
-                            final repository = ref.read(instanceRepositoryProvider);
+                            final repository =
+                                ref.read(instanceRepositoryProvider);
                             try {
-                              await repository.toggleInstance(instance.id, value);
+                              await repository.toggleInstance(
+                                  instance.id, value);
                               ref.invalidate(instancesProvider);
                             } catch (e) {
                               if (context.mounted) {
@@ -85,21 +89,20 @@ class _InstancesPageState extends ConsumerState<InstancesPage> {
                 ),
           loading: () => const Center(child: CircularProgressIndicator()),
           error: (error, stack) => Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Text('Error: $error'),
-                  const SizedBox(height: 16),
-                  ElevatedButton(
-                    onPressed: () => ref.invalidate(instancesProvider),
-                    child: const Text('Retry'),
-                  ),
-                ],
-              ),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Text('Error: $error'),
+                const SizedBox(height: 16),
+                ElevatedButton(
+                  onPressed: () => ref.invalidate(instancesProvider),
+                  child: const Text('Retry'),
+                ),
+              ],
             ),
+          ),
         ),
       ),
     );
   }
 }
-

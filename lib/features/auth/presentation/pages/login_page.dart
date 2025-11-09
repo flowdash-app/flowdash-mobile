@@ -4,7 +4,7 @@ import 'package:flowdash_mobile/features/auth/presentation/widgets/google_sign_i
 
 class LoginPage extends ConsumerWidget {
   const LoginPage({super.key});
-  
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     return Scaffold(
@@ -27,4 +27,3 @@ class LoginPage extends ConsumerWidget {
     );
   }
 }
-

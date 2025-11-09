@@ -1,3 +1,4 @@
+import 'package:dio/dio.dart';
 import 'package:logging/logging.dart';
 import 'package:flowdash_mobile/core/utils/logger.dart';
 import 'package:flowdash_mobile/core/utils/retry_helper.dart';
@@ -12,7 +13,7 @@ class WorkflowRepositoryImpl implements WorkflowRepository {
   final WorkflowLocalDataSource _localDataSource;
   final AnalyticsService _analytics;
   final Logger _logger = AppLogger.getLogger('WorkflowRepositoryImpl');
-  
+
   WorkflowRepositoryImpl({
     required WorkflowRemoteDataSource remoteDataSource,
     required WorkflowLocalDataSource localDataSource,
@@ -20,32 +21,34 @@ class WorkflowRepositoryImpl implements WorkflowRepository {
   })  : _remoteDataSource = remoteDataSource,
         _localDataSource = localDataSource,
         _analytics = analytics;
-  
+
   @override
-  Future<List<Workflow>> getWorkflows() async {
+  Future<List<Workflow>> getWorkflows({CancelToken? cancelToken}) async {
     final trace = _analytics.startTrace('get_workflows');
     trace?.start();
-    
+
     _logger.info('getWorkflows: Entry');
-    
+
     try {
       // Try local cache first
       final cached = await _localDataSource.getWorkflows();
       if (cached != null) {
         _logger.info('getWorkflows: Success (cached)');
-        await _analytics.logSuccess(action: 'get_workflows', parameters: {'source': 'cache'});
+        await _analytics.logSuccess(
+            action: 'get_workflows', parameters: {'source': 'cache'});
         trace?.stop();
         return cached;
       }
-      
+
       // Fetch from remote with retry
       final workflows = await RetryHelper.retry(
-        operation: () => _remoteDataSource.getWorkflows(),
+        operation: () => _remoteDataSource.getWorkflows(cancelToken: cancelToken),
         maxAttempts: 3,
       );
-      
+
       await _localDataSource.cacheWorkflows(workflows);
-      _logger.info('getWorkflows: Success (remote) - ${workflows.length} workflows');
+      _logger.info(
+          'getWorkflows: Success (remote) - ${workflows.length} workflows');
       await _analytics.logSuccess(
         action: 'get_workflows',
         parameters: {'source': 'remote', 'count': workflows.length},
@@ -62,20 +65,20 @@ class WorkflowRepositoryImpl implements WorkflowRepository {
       rethrow;
     }
   }
-  
+
   @override
-  Future<Workflow> getWorkflowById(String id) async {
+  Future<Workflow> getWorkflowById(String id, {CancelToken? cancelToken}) async {
     final trace = _analytics.startTrace('get_workflow_by_id');
     trace?.start();
-    
+
     _logger.info('getWorkflowById: Entry - $id');
-    
+
     try {
       final workflow = await RetryHelper.retry(
-        operation: () => _remoteDataSource.getWorkflowById(id),
+        operation: () => _remoteDataSource.getWorkflowById(id, cancelToken: cancelToken),
         maxAttempts: 3,
       );
-      
+
       _logger.info('getWorkflowById: Success - $id');
       await _analytics.logSuccess(
         action: 'get_workflow_by_id',
@@ -94,23 +97,23 @@ class WorkflowRepositoryImpl implements WorkflowRepository {
       rethrow;
     }
   }
-  
+
   @override
-  Future<void> toggleWorkflow(String id, bool enabled) async {
+  Future<void> toggleWorkflow(String id, bool enabled, {CancelToken? cancelToken}) async {
     final trace = _analytics.startTrace('toggle_workflow');
     trace?.start();
-    
+
     _logger.info('toggleWorkflow: Entry - $id, enabled: $enabled');
-    
+
     try {
       await RetryHelper.retry(
-        operation: () => _remoteDataSource.toggleWorkflow(id, enabled),
+        operation: () => _remoteDataSource.toggleWorkflow(id, enabled, cancelToken: cancelToken),
         maxAttempts: 3,
       );
-      
+
       // Invalidate cache after toggle
       await _localDataSource.clearCache();
-      
+
       _logger.info('toggleWorkflow: Success - $id');
       await _analytics.logSuccess(
         action: 'toggle_workflow',
@@ -128,11 +131,11 @@ class WorkflowRepositoryImpl implements WorkflowRepository {
       rethrow;
     }
   }
-  
+
   @override
   Future<void> refreshWorkflows() async {
     _logger.info('refreshWorkflows: Entry');
-    
+
     try {
       await _localDataSource.clearCache();
       _logger.info('refreshWorkflows: Success');
@@ -142,4 +145,3 @@ class WorkflowRepositoryImpl implements WorkflowRepository {
     }
   }
 }
-

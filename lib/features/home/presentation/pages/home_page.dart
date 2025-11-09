@@ -81,14 +81,15 @@ class _HomePageState extends ConsumerState<HomePage> {
                     ),
                   ),
                 const SizedBox(height: 24),
-                
+
                 // Workflows section
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     const Text(
                       'Workflows',
-                      style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                      style:
+                          TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
                     ),
                     TextButton(
                       onPressed: () => const WorkflowsRoute().go(context),
@@ -107,13 +108,13 @@ class _HomePageState extends ConsumerState<HomePage> {
                         )
                       : SizedBox(
                           height: 200,
-                          child: ListView.builder(
+                          child: CarouselView(
                             scrollDirection: Axis.horizontal,
-                            itemCount: workflows.take(5).length,
-                            itemBuilder: (context, index) {
-                              final workflow = workflows[index];
-                              return SizedBox(
-                                width: 200,
+                            itemExtent: 200,
+                            children: workflows.take(5).map((workflow) {
+                              return Padding(
+                                padding:
+                                    const EdgeInsets.symmetric(horizontal: 8.0),
                                 child: Card(
                                   child: ListTile(
                                     title: Text(workflow.name),
@@ -123,14 +124,18 @@ class _HomePageState extends ConsumerState<HomePage> {
                                     trailing: Switch(
                                       value: workflow.active,
                                       onChanged: (value) async {
-                                        final repository = ref.read(workflowRepositoryProvider);
+                                        final repository = ref
+                                            .read(workflowRepositoryProvider);
                                         try {
-                                          await repository.toggleWorkflow(workflow.id, value);
+                                          await repository.toggleWorkflow(
+                                              workflow.id, value);
                                           ref.invalidate(workflowsProvider);
                                         } catch (e) {
                                           if (context.mounted) {
-                                            ScaffoldMessenger.of(context).showSnackBar(
-                                              SnackBar(content: Text('Error: $e')),
+                                            ScaffoldMessenger.of(context)
+                                                .showSnackBar(
+                                              SnackBar(
+                                                  content: Text('Error: $e')),
                                             );
                                           }
                                         }
@@ -139,31 +144,32 @@ class _HomePageState extends ConsumerState<HomePage> {
                                   ),
                                 ),
                               );
-                            },
+                            }).toList(),
                           ),
                         ),
                   loading: () => const Card(
-                      child: Padding(
-                        padding: EdgeInsets.all(16.0),
-                        child: Center(child: CircularProgressIndicator()),
-                      ),
+                    child: Padding(
+                      padding: EdgeInsets.all(16.0),
+                      child: Center(child: CircularProgressIndicator()),
                     ),
+                  ),
                   error: (error, stack) => Card(
-                      child: Padding(
-                        padding: const EdgeInsets.all(16.0),
-                        child: Text('Error: $error'),
-                      ),
+                    child: Padding(
+                      padding: const EdgeInsets.all(16.0),
+                      child: Text('Error: $error'),
                     ),
+                  ),
                 ),
                 const SizedBox(height: 24),
-                
+
                 // Instances section
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     const Text(
                       'Instances',
-                      style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                      style:
+                          TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
                     ),
                     TextButton(
                       onPressed: () => const InstancesRoute().go(context),
@@ -182,13 +188,13 @@ class _HomePageState extends ConsumerState<HomePage> {
                         )
                       : SizedBox(
                           height: 200,
-                          child: ListView.builder(
+                          child: CarouselView(
                             scrollDirection: Axis.horizontal,
-                            itemCount: instances.take(5).length,
-                            itemBuilder: (context, index) {
-                              final instance = instances[index];
-                              return SizedBox(
-                                width: 200,
+                            itemExtent: 200,
+                            children: instances.take(5).map((instance) {
+                              return Padding(
+                                padding:
+                                    const EdgeInsets.symmetric(horizontal: 8.0),
                                 child: Card(
                                   child: ListTile(
                                     title: Text(instance.name),
@@ -196,14 +202,18 @@ class _HomePageState extends ConsumerState<HomePage> {
                                     trailing: Switch(
                                       value: instance.active,
                                       onChanged: (value) async {
-                                        final repository = ref.read(instanceRepositoryProvider);
+                                        final repository = ref
+                                            .read(instanceRepositoryProvider);
                                         try {
-                                          await repository.toggleInstance(instance.id, value);
+                                          await repository.toggleInstance(
+                                              instance.id, value);
                                           ref.invalidate(instancesProvider);
                                         } catch (e) {
                                           if (context.mounted) {
-                                            ScaffoldMessenger.of(context).showSnackBar(
-                                              SnackBar(content: Text('Error: $e')),
+                                            ScaffoldMessenger.of(context)
+                                                .showSnackBar(
+                                              SnackBar(
+                                                  content: Text('Error: $e')),
                                             );
                                           }
                                         }
@@ -212,21 +222,21 @@ class _HomePageState extends ConsumerState<HomePage> {
                                   ),
                                 ),
                               );
-                            },
+                            }).toList(),
                           ),
                         ),
                   loading: () => const Card(
-                      child: Padding(
-                        padding: EdgeInsets.all(16.0),
-                        child: Center(child: CircularProgressIndicator()),
-                      ),
+                    child: Padding(
+                      padding: EdgeInsets.all(16.0),
+                      child: Center(child: CircularProgressIndicator()),
                     ),
+                  ),
                   error: (error, stack) => Card(
-                      child: Padding(
-                        padding: const EdgeInsets.all(16.0),
-                        child: Text('Error: $error'),
-                      ),
+                    child: Padding(
+                      padding: const EdgeInsets.all(16.0),
+                      child: Text('Error: $error'),
                     ),
+                  ),
                 ),
               ],
             ),
@@ -236,4 +246,3 @@ class _HomePageState extends ConsumerState<HomePage> {
     );
   }
 }
-

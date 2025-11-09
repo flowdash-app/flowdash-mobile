@@ -9,7 +9,8 @@ class AuthRemoteDataSource {
   final firebase_auth.FirebaseAuth _firebaseAuth;
   final GoogleSignIn _googleSignIn;
   final Logger _logger = AppLogger.getLogger('AuthRemoteDataSource');
-  StreamSubscription<GoogleSignInAuthenticationEvent>? _authenticationSubscription;
+  StreamSubscription<GoogleSignInAuthenticationEvent>?
+      _authenticationSubscription;
 
   AuthRemoteDataSource({
     required firebase_auth.FirebaseAuth firebaseAuth,
@@ -23,7 +24,8 @@ class AuthRemoteDataSource {
       // to prevent automatic sign-in. Users must explicitly sign in via signInWithGoogle()
     }));
   }
-  Future<void> _handleAuthenticationEvent(GoogleSignInAuthenticationEvent event) async {
+  Future<void> _handleAuthenticationEvent(
+      GoogleSignInAuthenticationEvent event) async {
     _logger.info('Authentication event: $event');
     switch (event) {
       case GoogleSignInAuthenticationEventSignIn user:
@@ -31,12 +33,15 @@ class AuthRemoteDataSource {
         final GoogleSignInAccount googleUser = user.user;
         final GoogleSignInAuthentication googleAuth = googleUser.authentication;
         try {
-          final credential =
-              firebase_auth.GoogleAuthProvider.credential(idToken: googleAuth.idToken);
-          final userCredential = await _firebaseAuth.signInWithCredential(credential);
-          _logger.info('signInWithGoogle: Success - ${userCredential.user?.uid}');
+          final credential = firebase_auth.GoogleAuthProvider.credential(
+              idToken: googleAuth.idToken);
+          final userCredential =
+              await _firebaseAuth.signInWithCredential(credential);
+          _logger
+              .info('signInWithGoogle: Success - ${userCredential.user?.uid}');
         } catch (e, stackTrace) {
-          _logger.severe('signInWithGoogle: Failure - ${e.toString()}', e, stackTrace);
+          _logger.severe(
+              'signInWithGoogle: Failure - ${e.toString()}', e, stackTrace);
           await _firebaseAuth.signOut();
           rethrow;
         }
@@ -56,7 +61,8 @@ class AuthRemoteDataSource {
       // This prevents re-authentication issues with existing accounts
       try {
         await _googleSignIn.signOut();
-        _logger.info('signInWithGoogle: Cleared existing Google Sign-In session');
+        _logger
+            .info('signInWithGoogle: Cleared existing Google Sign-In session');
       } catch (e) {
         // Ignore errors when signing out (might not be signed in)
         _logger.info('signInWithGoogle: No existing session to clear');
@@ -65,7 +71,8 @@ class AuthRemoteDataSource {
       // Authenticate with Google Sign-In
       // This will show the account picker or sign-in UI
       // Note: authenticate() throws GoogleSignInException if canceled or fails
-      final googleUser = await _googleSignIn.authenticate(scopeHint: ['email', 'profile']);
+      final googleUser =
+          await _googleSignIn.authenticate(scopeHint: ['email', 'profile']);
 
       _logger.info('signInWithGoogle: Success - ${googleUser.email}');
       // Note: The actual Firebase sign-in happens via _handleAuthenticationEvent
@@ -77,7 +84,8 @@ class AuthRemoteDataSource {
         // Don't rethrow cancellation - it's expected user behavior
         return;
       } else {
-        _logger.severe('signInWithGoogle: Google Sign-In error - ${e.code}', e, StackTrace.current);
+        _logger.severe('signInWithGoogle: Google Sign-In error - ${e.code}', e,
+            StackTrace.current);
         rethrow;
       }
     } catch (e, stackTrace) {

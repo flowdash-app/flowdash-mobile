@@ -2,7 +2,8 @@ import 'package:firebase_auth/firebase_auth.dart' as firebase_auth;
 import 'package:flowdash_mobile/core/analytics/analytics_service.dart';
 import 'package:flowdash_mobile/features/auth/data/datasources/auth_remote_datasource.dart';
 import 'package:flowdash_mobile/features/auth/data/repositories/auth_repository_impl.dart';
-import 'package:flowdash_mobile/features/auth/domain/entities/user.dart' as domain;
+import 'package:flowdash_mobile/features/auth/domain/entities/user.dart'
+    as domain;
 import 'package:flowdash_mobile/features/auth/domain/repositories/auth_repository.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_sign_in/google_sign_in.dart';

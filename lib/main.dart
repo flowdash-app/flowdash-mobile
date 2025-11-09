@@ -71,6 +71,8 @@ class FlowDashApp extends ConsumerWidget {
     return MaterialApp.router(
       title: 'FlowDash',
       theme: AppTheme.lightTheme,
+      darkTheme: AppTheme.darkTheme,
+      themeMode: ThemeMode.system,
       routerConfig: router,
       debugShowCheckedModeBanner: false,
     );
