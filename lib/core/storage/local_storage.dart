@@ -95,6 +95,22 @@ class LocalStorage {
     return _prefs.getBool(AppConstants.hasCompletedOnboardingKey) ?? false;
   }
 
+  // Analytics consent management
+  Future<void> setAnalyticsConsent(bool value) async {
+    _logger.info('setAnalyticsConsent: Entry - $value');
+    try {
+      await _prefs.setBool(AppConstants.analyticsConsentKey, value);
+      _logger.info('setAnalyticsConsent: Success');
+    } catch (e, stackTrace) {
+      _logger.severe('setAnalyticsConsent: Failure', e, stackTrace);
+      rethrow;
+    }
+  }
+
+  bool hasAnalyticsConsent() {
+    return _prefs.getBool(AppConstants.analyticsConsentKey) ?? false;
+  }
+
   // Generic cache methods
   Future<void> saveString(String key, String value) async {
     await _prefs.setString('${AppConstants.storagePrefix}$key', value);

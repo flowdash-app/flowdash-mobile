@@ -15,6 +15,7 @@ class OnboardingPage extends ConsumerStatefulWidget {
 class _OnboardingPageState extends ConsumerState<OnboardingPage> {
   final PageController _pageController = PageController();
   int _currentPage = 0;
+  bool _analyticsConsent = true; // Default to true
 
   final List<Map<String, dynamic>> _slides = [
     {
@@ -77,14 +78,21 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage> {
   Future<void> _completeOnboarding() async {
     final localStorage = ref.read(localStorageProvider);
     final analytics = ref.read(analyticsServiceProvider);
+    final consentService = ref.read(analyticsConsentServiceProvider);
 
     try {
+      // Save onboarding completion
       await localStorage.setHasCompletedOnboarding(true);
+      
+      // Save analytics consent (defaults to true if user didn't change it)
+      await consentService.setAnalyticsConsent(_analyticsConsent);
+      
       await analytics.logEvent(
         name: 'onboarding_completed',
         parameters: {
           'slide_count': _slides.length,
           'final_slide': _currentPage,
+          'analytics_consent': _analyticsConsent,
         },
       );
 
@@ -148,10 +156,41 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage> {
                 itemCount: _slides.length,
                 itemBuilder: (context, index) {
                   final slide = _slides[index];
-                  return OnboardingSlide(
-                    title: slide['title'] as String,
-                    description: slide['description'] as String,
-                    icon: slide['icon'] as IconData,
+                  final isLastPage = index == _slides.length - 1;
+                  
+                  return Column(
+                    children: [
+                      Expanded(
+                        child: OnboardingSlide(
+                          title: slide['title'] as String,
+                          description: slide['description'] as String,
+                          icon: slide['icon'] as IconData,
+                        ),
+                      ),
+                      // Analytics consent on last page
+                      if (isLastPage)
+                        Padding(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 32.0,
+                            vertical: 16.0,
+                          ),
+                          child: Card(
+                            child: SwitchListTile(
+                              title: const Text('Enable Analytics'),
+                              subtitle: const Text(
+                                'Help us improve FlowDash by sharing anonymous usage data',
+                                style: TextStyle(fontSize: 12),
+                              ),
+                              value: _analyticsConsent,
+                              onChanged: (value) {
+                                setState(() {
+                                  _analyticsConsent = value;
+                                });
+                              },
+                            ),
+                          ),
+                        ),
+                    ],
                   );
                 },
               ),

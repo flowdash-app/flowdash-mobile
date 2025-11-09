@@ -1,5 +1,7 @@
 import 'package:firebase_auth/firebase_auth.dart' as firebase_auth;
 import 'package:flowdash_mobile/core/analytics/analytics_service.dart';
+import 'package:flowdash_mobile/core/analytics/analytics_consent_service.dart';
+import 'package:flowdash_mobile/core/storage/local_storage_provider.dart';
 import 'package:flowdash_mobile/features/auth/data/datasources/auth_remote_datasource.dart';
 import 'package:flowdash_mobile/features/auth/data/repositories/auth_repository_impl.dart';
 import 'package:flowdash_mobile/features/auth/domain/entities/user.dart'
@@ -44,5 +46,11 @@ final authStateProvider = StreamProvider<domain.User?>((ref) {
 });
 
 final analyticsServiceProvider = Provider<AnalyticsService>((ref) {
-  return AnalyticsService();
+  final localStorage = ref.watch(localStorageProvider);
+  return AnalyticsService(localStorage: localStorage);
+});
+
+final analyticsConsentServiceProvider = Provider<AnalyticsConsentService>((ref) {
+  final localStorage = ref.watch(localStorageProvider);
+  return AnalyticsConsentService(localStorage);
 });
