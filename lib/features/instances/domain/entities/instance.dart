@@ -5,7 +5,7 @@ class Instance {
   final bool active;
   final DateTime? lastConnectedAt;
   final DateTime? createdAt;
-  
+
   const Instance({
     required this.id,
     required this.name,
@@ -14,7 +14,7 @@ class Instance {
     this.lastConnectedAt,
     this.createdAt,
   });
-  
+
   Instance copyWith({
     String? id,
     String? name,
@@ -33,4 +33,3 @@ class Instance {
     );
   }
 }
-

@@ -9,11 +9,11 @@ class AnalyticsService {
   final FirebaseCrashlytics _crashlytics = FirebaseCrashlytics.instance;
   final FirebasePerformance _performance = FirebasePerformance.instance;
   final Logger _logger = AppLogger.getLogger('AnalyticsService');
-  
+
   // Set user ID for all Firebase services
   Future<void> setUserId(String? userId) async {
     _logger.info('setUserId: Entry - $userId');
-    
+
     try {
       if (userId != null) {
         await _analytics.setUserId(id: userId);
@@ -27,14 +27,14 @@ class AnalyticsService {
       _logger.severe('setUserId: Failure', e, stackTrace);
     }
   }
-  
+
   // Log custom events
   Future<void> logEvent({
     required String name,
     Map<String, Object>? parameters,
   }) async {
     _logger.info('logEvent: Entry - $name');
-    
+
     try {
       await _analytics.logEvent(
         name: name,
@@ -45,7 +45,7 @@ class AnalyticsService {
       _logger.severe('logEvent: Failure', e, stackTrace);
     }
   }
-  
+
   // Log success events
   Future<void> logSuccess({
     required String action,
@@ -60,7 +60,7 @@ class AnalyticsService {
       },
     );
   }
-  
+
   // Log failure events
   Future<void> logFailure({
     required String action,
@@ -76,7 +76,7 @@ class AnalyticsService {
         ...?parameters,
       },
     );
-    
+
     // Also log to Crashlytics (non-fatal)
     await _crashlytics.recordError(
       Exception(error),
@@ -85,20 +85,20 @@ class AnalyticsService {
       fatal: false,
     );
   }
-  
+
   // Start performance trace
   Trace? startTrace(String name) {
     _logger.info('startTrace: Entry - $name');
     return _performance.newTrace(name);
   }
-  
+
   // Log screen view
   Future<void> logScreenView({
     required String screenName,
     String? screenClass,
   }) async {
     _logger.info('logScreenView: Entry - $screenName');
-    
+
     try {
       await _analytics.logScreenView(
         screenName: screenName,
@@ -110,4 +110,3 @@ class AnalyticsService {
     }
   }
 }
-

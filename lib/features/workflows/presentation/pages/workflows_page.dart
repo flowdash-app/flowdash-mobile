@@ -58,7 +58,9 @@ class _WorkflowsPageState extends ConsumerState<WorkflowsPage> {
                             Text(
                               workflow.active ? 'Active' : 'Inactive',
                               style: TextStyle(
-                                color: workflow.active ? Colors.green : Colors.grey,
+                                color: workflow.active
+                                    ? Colors.green
+                                    : Colors.grey,
                                 fontWeight: FontWeight.bold,
                               ),
                             ),
@@ -67,9 +69,11 @@ class _WorkflowsPageState extends ConsumerState<WorkflowsPage> {
                         trailing: Switch(
                           value: workflow.active,
                           onChanged: (value) async {
-                            final repository = ref.read(workflowRepositoryProvider);
+                            final repository =
+                                ref.read(workflowRepositoryProvider);
                             try {
-                              await repository.toggleWorkflow(workflow.id, value);
+                              await repository.toggleWorkflow(
+                                  workflow.id, value);
                               ref.invalidate(workflowsProvider);
                             } catch (e) {
                               if (context.mounted) {
@@ -86,21 +90,20 @@ class _WorkflowsPageState extends ConsumerState<WorkflowsPage> {
                 ),
           loading: () => const Center(child: CircularProgressIndicator()),
           error: (error, stack) => Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Text('Error: $error'),
-                  const SizedBox(height: 16),
-                  ElevatedButton(
-                    onPressed: () => ref.invalidate(workflowsProvider),
-                    child: const Text('Retry'),
-                  ),
-                ],
-              ),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Text('Error: $error'),
+                const SizedBox(height: 16),
+                ElevatedButton(
+                  onPressed: () => ref.invalidate(workflowsProvider),
+                  child: const Text('Retry'),
+                ),
+              ],
             ),
+          ),
         ),
       ),
     );
   }
 }
-

@@ -9,7 +9,7 @@ class WorkflowModel extends Workflow {
     super.updatedAt,
     super.createdAt,
   });
-  
+
   factory WorkflowModel.fromJson(Map<String, dynamic> json) {
     return WorkflowModel(
       id: json['id'] as String,
@@ -24,7 +24,7 @@ class WorkflowModel extends Workflow {
           : null,
     );
   }
-  
+
   Map<String, dynamic> toJson() {
     return {
       'id': id,
@@ -35,7 +35,7 @@ class WorkflowModel extends Workflow {
       if (createdAt != null) 'createdAt': createdAt!.toIso8601String(),
     };
   }
-  
+
   @override
   WorkflowModel copyWith({
     String? id,
@@ -55,4 +55,3 @@ class WorkflowModel extends Workflow {
     );
   }
 }
-

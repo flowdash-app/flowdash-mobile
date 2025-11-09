@@ -1,3 +1,4 @@
+import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flowdash_mobile/features/auth/presentation/providers/auth_provider.dart';
 import 'package:flowdash_mobile/features/workflows/domain/repositories/workflow_repository.dart';
@@ -6,7 +7,8 @@ import 'package:flowdash_mobile/features/workflows/data/datasources/workflow_rem
 import 'package:flowdash_mobile/features/workflows/data/datasources/workflow_local_datasource.dart';
 import 'package:flowdash_mobile/features/workflows/domain/entities/workflow.dart';
 
-final workflowLocalDataSourceProvider = Provider<WorkflowLocalDataSource>((ref) {
+final workflowLocalDataSourceProvider =
+    Provider<WorkflowLocalDataSource>((ref) {
   return WorkflowLocalDataSource();
 });
 
@@ -23,11 +25,27 @@ final workflowRepositoryProvider = Provider<WorkflowRepository>((ref) {
 
 final workflowsProvider = FutureProvider<List<Workflow>>((ref) async {
   final repository = ref.watch(workflowRepositoryProvider);
-  return repository.getWorkflows();
+  final cancelToken = CancelToken();
+  
+  ref.onDispose(() {
+    if (!cancelToken.isCancelled) {
+      cancelToken.cancel('Provider disposed');
+    }
+  });
+  
+  return repository.getWorkflows(cancelToken: cancelToken);
 });
 
-final workflowProvider = FutureProvider.family<Workflow, String>((ref, id) async {
+final workflowProvider =
+    FutureProvider.family<Workflow, String>((ref, id) async {
   final repository = ref.watch(workflowRepositoryProvider);
-  return repository.getWorkflowById(id);
+  final cancelToken = CancelToken();
+  
+  ref.onDispose(() {
+    if (!cancelToken.isCancelled) {
+      cancelToken.cancel('Provider disposed');
+    }
+  });
+  
+  return repository.getWorkflowById(id, cancelToken: cancelToken);
 });
-

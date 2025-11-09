@@ -47,11 +47,11 @@ class AuthRepositoryImpl implements AuthRepository {
       return firebaseUser != null ? User.fromFirebaseUser(firebaseUser) : null;
     });
   }
-  
+
   @override
   Future<String?> getAuthToken() async {
     _logger.info('getAuthToken: Entry');
-    
+
     try {
       final token = await _remoteDataSource.getAuthToken();
       _logger.info('getAuthToken: Success');

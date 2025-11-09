@@ -799,3 +799,7 @@ Future<T> retry<T>(Future<T> Function() fn, {int maxAttempts = 3}) async {
 - Include context in error logs
 - Use appropriate log levels
 - Don't log sensitive information
+
+
+
+You have the Flutter MCP - look in your toolbox and use them

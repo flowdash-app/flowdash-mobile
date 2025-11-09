@@ -1,4 +1,5 @@
 import 'package:flowdash_mobile/core/routing/app_router.dart';
+import 'package:flowdash_mobile/core/storage/local_storage_provider.dart';
 import 'package:flowdash_mobile/features/auth/presentation/providers/auth_provider.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -21,15 +22,34 @@ final routerProvider = Provider<GoRouter>((ref) {
       final currentLocation = state.matchedLocation;
       final isLoggingIn = currentLocation == LoginRoute().location;
       final isSplash = currentLocation == SplashRoute().location;
+      final isOnboarding = currentLocation == OnboardingRoute().location;
 
-      // If authenticated, redirect away from login/splash to home
-      if (isAuthenticated && (isLoggingIn || isSplash)) {
-        return HomeRoute().location;
+      // If not authenticated, redirect to login (unless already on login or onboarding)
+      if (!isAuthenticated) {
+        if (!isLoggingIn && !isOnboarding) {
+          return LoginRoute().location;
+        }
+        return null;
       }
 
-      // If not authenticated, redirect to login (unless already on login)
-      if (!isAuthenticated && !isLoggingIn) {
-        return LoginRoute().location;
+      // If authenticated, check onboarding status
+      if (isAuthenticated) {
+        final localStorage = ref.read(localStorageProvider);
+        final hasCompletedOnboarding = localStorage.hasCompletedOnboarding();
+
+        // If on login/splash, redirect based on onboarding status
+        if (isLoggingIn || isSplash) {
+          if (!hasCompletedOnboarding) {
+            return OnboardingRoute().location;
+          } else {
+            return HomeRoute().location;
+          }
+        }
+
+        // If on onboarding but already completed, redirect to home
+        if (isOnboarding && hasCompletedOnboarding) {
+          return HomeRoute().location;
+        }
       }
 
       return null;

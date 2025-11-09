@@ -1,7 +1,7 @@
 abstract class AppException implements Exception {
   final String message;
   AppException(this.message);
-  
+
   @override
   String toString() => message;
 }
@@ -15,17 +15,15 @@ class UnauthorizedException extends AppException {
 }
 
 class NotFoundException extends AppException {
-  NotFoundException([String? resource]) 
+  NotFoundException([String? resource])
       : super(resource != null ? '$resource not found' : 'Resource not found');
 }
 
 class ServerException extends AppException {
-  ServerException([String? message]) 
+  ServerException([String? message])
       : super(message ?? 'Server error occurred');
 }
 
 class CacheException extends AppException {
-  CacheException([String? message]) 
-      : super(message ?? 'Cache error occurred');
+  CacheException([String? message]) : super(message ?? 'Cache error occurred');
 }
-

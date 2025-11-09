@@ -6,4 +6,3 @@ final apiClientProvider = Provider<ApiClient>((ref) {
   final authRepository = ref.watch(authRepositoryProvider);
   return ApiClient(authRepository: authRepository);
 });
-

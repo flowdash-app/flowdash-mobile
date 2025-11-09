@@ -5,7 +5,7 @@ class Workflow {
   final String? description;
   final DateTime? updatedAt;
   final DateTime? createdAt;
-  
+
   const Workflow({
     required this.id,
     required this.name,
@@ -14,7 +14,7 @@ class Workflow {
     this.updatedAt,
     this.createdAt,
   });
-  
+
   Workflow copyWith({
     String? id,
     String? name,
@@ -33,4 +33,3 @@ class Workflow {
     );
   }
 }
-

@@ -4,7 +4,7 @@ import 'package:flowdash_mobile/core/utils/logger.dart';
 
 class LoggingInterceptor extends Interceptor {
   final Logger _logger = AppLogger.getLogger('LoggingInterceptor');
-  
+
   @override
   void onRequest(RequestOptions options, RequestInterceptorHandler handler) {
     _logger.info('Request: ${options.method} ${options.uri}');
@@ -13,13 +13,14 @@ class LoggingInterceptor extends Interceptor {
     }
     handler.next(options);
   }
-  
+
   @override
   void onResponse(Response response, ResponseInterceptorHandler handler) {
-    _logger.info('Response: ${response.statusCode} ${response.requestOptions.uri}');
+    _logger.info(
+        'Response: ${response.statusCode} ${response.requestOptions.uri}');
     handler.next(response);
   }
-  
+
   @override
   void onError(DioException err, ErrorInterceptorHandler handler) {
     _logger.severe(
@@ -30,4 +31,3 @@ class LoggingInterceptor extends Interceptor {
     handler.next(err);
   }
 }
-
