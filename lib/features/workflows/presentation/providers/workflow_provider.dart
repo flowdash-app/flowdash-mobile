@@ -26,13 +26,13 @@ final workflowRepositoryProvider = Provider<WorkflowRepository>((ref) {
 final workflowsProvider = FutureProvider<List<Workflow>>((ref) async {
   final repository = ref.watch(workflowRepositoryProvider);
   final cancelToken = CancelToken();
-  
+
   ref.onDispose(() {
     if (!cancelToken.isCancelled) {
       cancelToken.cancel('Provider disposed');
     }
   });
-  
+
   return repository.getWorkflows(cancelToken: cancelToken);
 });
 
@@ -40,12 +40,12 @@ final workflowProvider =
     FutureProvider.family<Workflow, String>((ref, id) async {
   final repository = ref.watch(workflowRepositoryProvider);
   final cancelToken = CancelToken();
-  
+
   ref.onDispose(() {
     if (!cancelToken.isCancelled) {
       cancelToken.cancel('Provider disposed');
     }
   });
-  
+
   return repository.getWorkflowById(id, cancelToken: cancelToken);
 });

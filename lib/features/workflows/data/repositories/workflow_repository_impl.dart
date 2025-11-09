@@ -42,7 +42,8 @@ class WorkflowRepositoryImpl implements WorkflowRepository {
 
       // Fetch from remote with retry
       final workflows = await RetryHelper.retry(
-        operation: () => _remoteDataSource.getWorkflows(cancelToken: cancelToken),
+        operation: () =>
+            _remoteDataSource.getWorkflows(cancelToken: cancelToken),
         maxAttempts: 3,
       );
 
@@ -67,7 +68,8 @@ class WorkflowRepositoryImpl implements WorkflowRepository {
   }
 
   @override
-  Future<Workflow> getWorkflowById(String id, {CancelToken? cancelToken}) async {
+  Future<Workflow> getWorkflowById(String id,
+      {CancelToken? cancelToken}) async {
     final trace = _analytics.startTrace('get_workflow_by_id');
     trace?.start();
 
@@ -75,7 +77,8 @@ class WorkflowRepositoryImpl implements WorkflowRepository {
 
     try {
       final workflow = await RetryHelper.retry(
-        operation: () => _remoteDataSource.getWorkflowById(id, cancelToken: cancelToken),
+        operation: () =>
+            _remoteDataSource.getWorkflowById(id, cancelToken: cancelToken),
         maxAttempts: 3,
       );
 
@@ -99,7 +102,8 @@ class WorkflowRepositoryImpl implements WorkflowRepository {
   }
 
   @override
-  Future<void> toggleWorkflow(String id, bool enabled, {CancelToken? cancelToken}) async {
+  Future<void> toggleWorkflow(String id, bool enabled,
+      {CancelToken? cancelToken}) async {
     final trace = _analytics.startTrace('toggle_workflow');
     trace?.start();
 
@@ -107,7 +111,8 @@ class WorkflowRepositoryImpl implements WorkflowRepository {
 
     try {
       await RetryHelper.retry(
-        operation: () => _remoteDataSource.toggleWorkflow(id, enabled, cancelToken: cancelToken),
+        operation: () => _remoteDataSource.toggleWorkflow(id, enabled,
+            cancelToken: cancelToken),
         maxAttempts: 3,
       );
 

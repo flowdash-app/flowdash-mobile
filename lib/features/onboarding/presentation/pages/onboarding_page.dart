@@ -180,7 +180,8 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage> {
 
             // Navigation buttons
             Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 32.0, vertical: 16.0),
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 32.0, vertical: 16.0),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
@@ -214,4 +215,3 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage> {
     );
   }
 }
-

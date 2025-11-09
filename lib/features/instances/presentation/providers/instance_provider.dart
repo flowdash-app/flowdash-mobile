@@ -29,13 +29,13 @@ final instanceRepositoryProvider = Provider<InstanceRepository>((ref) {
 final instancesProvider = FutureProvider<List<Instance>>((ref) async {
   final repository = ref.watch(instanceRepositoryProvider);
   final cancelToken = CancelToken();
-  
+
   ref.onDispose(() {
     if (!cancelToken.isCancelled) {
       cancelToken.cancel('Provider disposed');
     }
   });
-  
+
   return repository.getInstances(cancelToken: cancelToken);
 });
 
@@ -43,12 +43,12 @@ final instanceProvider =
     FutureProvider.family<Instance, String>((ref, id) async {
   final repository = ref.watch(instanceRepositoryProvider);
   final cancelToken = CancelToken();
-  
+
   ref.onDispose(() {
     if (!cancelToken.isCancelled) {
       cancelToken.cancel('Provider disposed');
     }
   });
-  
+
   return repository.getInstanceById(id, cancelToken: cancelToken);
 });

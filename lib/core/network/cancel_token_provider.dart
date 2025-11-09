@@ -13,4 +13,3 @@ final cancelTokenProvider = Provider<CancelToken>((ref) {
   });
   return token;
 });
-

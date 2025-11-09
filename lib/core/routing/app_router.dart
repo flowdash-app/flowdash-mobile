@@ -30,7 +30,8 @@ class OnboardingRoute extends GoRouteData with $OnboardingRoute {
   const OnboardingRoute();
 
   @override
-  Widget build(BuildContext context, GoRouterState state) => const OnboardingPage();
+  Widget build(BuildContext context, GoRouterState state) =>
+      const OnboardingPage();
 }
 
 @TypedGoRoute<HomeRoute>(path: '/home')

@@ -46,7 +46,8 @@ class InstanceRepositoryImpl implements InstanceRepository {
 
       // Fetch from remote with retry
       final instances = await RetryHelper.retry(
-        operation: () => _remoteDataSource.getInstances(cancelToken: cancelToken),
+        operation: () =>
+            _remoteDataSource.getInstances(cancelToken: cancelToken),
         maxAttempts: 3,
       );
 
@@ -71,7 +72,8 @@ class InstanceRepositoryImpl implements InstanceRepository {
   }
 
   @override
-  Future<Instance> getInstanceById(String id, {CancelToken? cancelToken}) async {
+  Future<Instance> getInstanceById(String id,
+      {CancelToken? cancelToken}) async {
     final trace = _analytics.startTrace('get_instance_by_id');
     trace?.start();
 
@@ -79,7 +81,8 @@ class InstanceRepositoryImpl implements InstanceRepository {
 
     try {
       final instance = await RetryHelper.retry(
-        operation: () => _remoteDataSource.getInstanceById(id, cancelToken: cancelToken),
+        operation: () =>
+            _remoteDataSource.getInstanceById(id, cancelToken: cancelToken),
         maxAttempts: 3,
       );
 
@@ -103,7 +106,8 @@ class InstanceRepositoryImpl implements InstanceRepository {
   }
 
   @override
-  Future<void> toggleInstance(String id, bool enabled, {CancelToken? cancelToken}) async {
+  Future<void> toggleInstance(String id, bool enabled,
+      {CancelToken? cancelToken}) async {
     final trace = _analytics.startTrace('toggle_instance');
     trace?.start();
 
@@ -111,7 +115,8 @@ class InstanceRepositoryImpl implements InstanceRepository {
 
     try {
       await RetryHelper.retry(
-        operation: () => _remoteDataSource.toggleInstance(id, enabled, cancelToken: cancelToken),
+        operation: () => _remoteDataSource.toggleInstance(id, enabled,
+            cancelToken: cancelToken),
         maxAttempts: 3,
       );
 

@@ -32,8 +32,10 @@ class _HomePageState extends ConsumerState<HomePage> {
           IconButton(
             icon: const Icon(Icons.refresh),
             onPressed: () {
-              ref.invalidate(workflowsProvider);
-              ref.invalidate(instancesProvider);
+              // ignore: unused_result
+              ref.refresh(workflowsProvider);
+              // ignore: unused_result
+              ref.refresh(instancesProvider);
             },
           ),
           PopupMenuButton(
@@ -54,8 +56,14 @@ class _HomePageState extends ConsumerState<HomePage> {
       ),
       body: RefreshIndicator(
         onRefresh: () async {
-          ref.invalidate(workflowsProvider);
-          ref.invalidate(instancesProvider);
+          // ignore: unused_result
+          ref.refresh(workflowsProvider);
+          // ignore: unused_result
+          ref.refresh(instancesProvider);
+          await Future.wait([
+            ref.read(workflowsProvider.future),
+            ref.read(instancesProvider.future),
+          ]);
         },
         child: SingleChildScrollView(
           physics: const AlwaysScrollableScrollPhysics(),
