@@ -3,6 +3,8 @@ import 'package:firebase_crashlytics/firebase_crashlytics.dart';
 import 'package:firebase_performance/firebase_performance.dart';
 import 'package:flowdash_mobile/core/routing/router_config.dart';
 import 'package:flowdash_mobile/core/utils/logger.dart';
+import 'package:flowdash_mobile/core/analytics/analytics_consent_service.dart';
+import 'package:flowdash_mobile/core/storage/local_storage.dart';
 import 'package:flowdash_mobile/features/auth/presentation/providers/auth_provider.dart';
 import 'package:flowdash_mobile/shared/theme/app_theme.dart';
 import 'package:flutter/foundation.dart';
@@ -36,6 +38,12 @@ void main() async {
 
   // Initialize SharedPreferences
   final sharedPreferences = await SharedPreferences.getInstance();
+
+  // Initialize analytics consent (must be done before runApp)
+  // Analytics collection is disabled by default until user consents
+  final localStorage = LocalStorage(sharedPreferences);
+  final analyticsConsentService = AnalyticsConsentService(localStorage);
+  await analyticsConsentService.initializeConsent();
 
   runApp(
     ProviderScope(

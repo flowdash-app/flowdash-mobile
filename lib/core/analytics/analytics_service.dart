@@ -3,15 +3,33 @@ import 'package:firebase_crashlytics/firebase_crashlytics.dart';
 import 'package:firebase_performance/firebase_performance.dart';
 import 'package:logging/logging.dart';
 import 'package:flowdash_mobile/core/utils/logger.dart';
+import 'package:flowdash_mobile/core/storage/local_storage.dart';
 
 class AnalyticsService {
   final FirebaseAnalytics _analytics = FirebaseAnalytics.instance;
   final FirebaseCrashlytics _crashlytics = FirebaseCrashlytics.instance;
   final FirebasePerformance _performance = FirebasePerformance.instance;
   final Logger _logger = AppLogger.getLogger('AnalyticsService');
+  final LocalStorage? _localStorage;
+
+  AnalyticsService({LocalStorage? localStorage}) : _localStorage = localStorage;
+
+  /// Check if analytics collection is enabled (user has consented)
+  bool _isCollectionEnabled() {
+    if (_localStorage == null) {
+      // If no localStorage provided, assume enabled (for backward compatibility)
+      return true;
+    }
+    return _localStorage!.hasAnalyticsConsent();
+  }
 
   // Set user ID for all Firebase services
   Future<void> setUserId(String? userId) async {
+    if (!_isCollectionEnabled()) {
+      _logger.info('setUserId: Skipped - Analytics collection disabled');
+      return;
+    }
+
     _logger.info('setUserId: Entry - $userId');
 
     try {
@@ -33,6 +51,11 @@ class AnalyticsService {
     required String name,
     Map<String, Object>? parameters,
   }) async {
+    if (!_isCollectionEnabled()) {
+      _logger.info('logEvent: Skipped - Analytics collection disabled - $name');
+      return;
+    }
+
     _logger.info('logEvent: Entry - $name');
 
     try {
@@ -97,6 +120,11 @@ class AnalyticsService {
     required String screenName,
     String? screenClass,
   }) async {
+    if (!_isCollectionEnabled()) {
+      _logger.info('logScreenView: Skipped - Analytics collection disabled - $screenName');
+      return;
+    }
+
     _logger.info('logScreenView: Entry - $screenName');
 
     try {

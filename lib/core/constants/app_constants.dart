@@ -10,6 +10,7 @@ class AppConstants {
   static const String userIdKey = '${storagePrefix}user_id';
   static const String hasSetInstanceKey = '${storagePrefix}has_set_instance';
   static const String hasCompletedOnboardingKey = '${storagePrefix}has_completed_onboarding';
+  static const String analyticsConsentKey = '${storagePrefix}analytics_consent';
 
   // Deep Link Scheme
   static const String deepLinkScheme = 'flowdash';
