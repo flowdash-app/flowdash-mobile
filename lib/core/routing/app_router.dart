@@ -54,7 +54,6 @@ class HomeRoute extends GoRouteData with $HomeRoute {
       const MainTabPage(initialIndex: 0);
 }
 
-@TypedGoRoute<HomeWorkflowsRoute>(path: '/home/workflows')
 class HomeWorkflowsRoute extends GoRouteData with $HomeWorkflowsRoute {
   const HomeWorkflowsRoute();
 
@@ -63,7 +62,6 @@ class HomeWorkflowsRoute extends GoRouteData with $HomeWorkflowsRoute {
       const MainTabPage(initialIndex: 1);
 }
 
-@TypedGoRoute<HomeInstancesRoute>(path: '/home/instances')
 class HomeInstancesRoute extends GoRouteData with $HomeInstancesRoute {
   const HomeInstancesRoute();
 
@@ -72,7 +70,6 @@ class HomeInstancesRoute extends GoRouteData with $HomeInstancesRoute {
       const MainTabPage(initialIndex: 2);
 }
 
-@TypedGoRoute<HomeSettingsRoute>(path: '/home/settings')
 class HomeSettingsRoute extends GoRouteData with $HomeSettingsRoute {
   const HomeSettingsRoute();
 

@@ -121,15 +121,16 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
             leading: const Icon(Icons.code),
             title: const Text('Open Source Licenses'),
             trailing: const Icon(Icons.chevron_right),
-            onTap: () {
+            onTap: () async {
               analytics.logEvent(
                 name: 'settings_action',
                 parameters: {'action_type': 'view_licenses'},
               );
+              final packageInfo = await PackageInfo.fromPlatform();
               showLicensePage(
                 context: context,
                 applicationName: 'FlowDash',
-                applicationVersion: '1.0.0',
+                applicationVersion: packageInfo.version,
               );
             },
           ),

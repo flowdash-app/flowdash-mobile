@@ -42,7 +42,7 @@ class _PrivacyPolicyPageState extends ConsumerState<PrivacyPolicyPage> {
             ),
             SizedBox(height: 16),
             Text(
-              'Last updated: [Date]',
+              'Last updated: June 1, 2024',
               style: TextStyle(fontSize: 14, color: Colors.grey),
             ),
             SizedBox(height: 24),
@@ -107,7 +107,7 @@ class _PrivacyPolicyPageState extends ConsumerState<PrivacyPolicyPage> {
             ),
             SizedBox(height: 8),
             Text(
-              'If you have questions about this privacy policy, please contact us at [contact email].',
+              'If you have questions about this privacy policy, please contact us at support@flowdash.com.',
               style: TextStyle(fontSize: 16),
             ),
           ],

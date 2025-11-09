@@ -43,7 +43,7 @@ class _TermsOfServicePageState extends ConsumerState<TermsOfServicePage> {
             ),
             SizedBox(height: 16),
             Text(
-              'Last updated: [Date]',
+              'Last updated: June 10, 2024',
               style: TextStyle(fontSize: 14, color: Colors.grey),
             ),
             SizedBox(height: 24),
