@@ -7,6 +7,12 @@ class ErrorInterceptor extends Interceptor {
     AppException exception;
 
     switch (err.type) {
+      case DioExceptionType.connectionError:
+        // DNS failures, connection errors - preserve original message
+        exception = NetworkException(
+          err.message ?? 'Connection error occurred',
+        );
+        break;
       case DioExceptionType.connectionTimeout:
       case DioExceptionType.sendTimeout:
       case DioExceptionType.receiveTimeout:
@@ -31,11 +37,13 @@ class ErrorInterceptor extends Interceptor {
         break;
       case DioExceptionType.unknown:
       default:
-        exception = NetworkException(
-          err.message ?? 'Unknown network error occurred',
-        );
+        // Preserve original error message for better debugging
+        final errorMessage = err.message ?? 'Unknown network error occurred';
+        exception = NetworkException(errorMessage);
     }
 
+    // Preserve the original response for better error handling
+    // The status code is available via err.response?.statusCode
     handler.reject(
       DioException(
         requestOptions: err.requestOptions,

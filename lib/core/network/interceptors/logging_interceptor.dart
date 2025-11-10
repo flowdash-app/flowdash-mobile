@@ -16,8 +16,18 @@ class LoggingInterceptor extends Interceptor {
 
   @override
   void onResponse(Response response, ResponseInterceptorHandler handler) {
-    _logger.info(
-        'Response: ${response.statusCode} ${response.requestOptions.uri}');
+    final statusCode = response.statusCode;
+    final uri = response.requestOptions.uri;
+    
+    // Log redirects with more detail
+    if (statusCode != null && statusCode >= 300 && statusCode < 400) {
+      _logger.warning(
+        'Redirect: $statusCode ${response.requestOptions.method} $uri -> ${response.headers.value('location') ?? 'unknown'}',
+      );
+    } else {
+      _logger.info('Response: $statusCode ${response.requestOptions.method} $uri');
+    }
+    
     handler.next(response);
   }
 

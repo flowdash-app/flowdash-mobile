@@ -46,6 +46,25 @@ class AnalyticsService {
     }
   }
 
+  // Convert parameters to Firebase Analytics compatible types
+  // Firebase Analytics only accepts String or num, not bool
+  Map<String, Object>? _convertParameters(Map<String, Object>? parameters) {
+    if (parameters == null) return null;
+    
+    return parameters.map((key, value) {
+      // Convert bool to String ('true' or 'false')
+      if (value is bool) {
+        return MapEntry(key, value.toString());
+      }
+      // Ensure value is String or num (Firebase Analytics requirement)
+      if (value is String || value is num) {
+        return MapEntry(key, value);
+      }
+      // Convert other types to String
+      return MapEntry(key, value.toString());
+    });
+  }
+
   // Log custom events
   Future<void> logEvent({
     required String name,
@@ -59,9 +78,12 @@ class AnalyticsService {
     _logger.info('logEvent: Entry - $name');
 
     try {
+      // Convert parameters to Firebase Analytics compatible types
+      final convertedParameters = _convertParameters(parameters);
+      
       await _analytics.logEvent(
         name: name,
-        parameters: parameters,
+        parameters: convertedParameters,
       );
       _logger.info('logEvent: Success - $name');
     } catch (e, stackTrace) {
@@ -89,6 +111,7 @@ class AnalyticsService {
     required String action,
     required String error,
     Map<String, Object>? parameters,
+    bool sendToCrashlytics = true,
   }) async {
     await logEvent(
       name: '${action}_failure',
@@ -100,13 +123,25 @@ class AnalyticsService {
       },
     );
 
-    // Also log to Crashlytics (non-fatal)
-    await _crashlytics.recordError(
-      Exception(error),
-      StackTrace.current,
-      reason: 'Action failed: $action',
-      fatal: false,
-    );
+    // Only send to Crashlytics if it's an actual error (not business logic exceptions)
+    // Business logic exceptions (like "No active instance found") are expected states
+    if (sendToCrashlytics) {
+      // Check if this is a business logic exception (expected state)
+      final isBusinessLogicException = error.contains('No active instance found') ||
+          error.contains('No instances found') ||
+          error.contains('Please activate') ||
+          error.contains('not found') && !error.contains('Resource not found');
+      
+      if (!isBusinessLogicException) {
+        // Only log actual errors to Crashlytics (non-fatal)
+        await _crashlytics.recordError(
+          Exception(error),
+          StackTrace.current,
+          reason: 'Action failed: $action',
+          fatal: false,
+        );
+      }
+    }
   }
 
   // Start performance trace

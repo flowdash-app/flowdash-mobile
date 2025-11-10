@@ -17,6 +17,10 @@ class ApiClient {
     _dio.options.baseUrl = AppConstants.apiBaseUrl;
     _dio.options.connectTimeout = AppConstants.connectTimeout;
     _dio.options.receiveTimeout = AppConstants.receiveTimeout;
+    // Limit redirects to prevent redirect loops
+    // Dio follows redirects automatically by default
+    _dio.options.followRedirects = true;
+    _dio.options.maxRedirects = 5;
 
     _dio.interceptors.addAll([
       AuthInterceptor(authRepository),

@@ -41,26 +41,58 @@ class _AboutPageState extends ConsumerState<AboutPage> {
     }
   }
 
+  void _showLicenses(BuildContext context) {
+    final analytics = ref.read(analyticsServiceProvider);
+    final version = _packageInfo?.version ?? '1.0.0';
+    
+    analytics.logEvent(
+      name: 'about_action',
+      parameters: {'action_type': 'view_licenses'},
+    );
+    
+    showLicensePage(
+      context: context,
+      applicationName: 'FlowDash',
+      applicationVersion: version,
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('About'),
-      ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
-          : SingleChildScrollView(
-              padding: const EdgeInsets.all(16.0),
-              child: Column(
+          : CustomScrollView(
+              slivers: [
+                SliverAppBar(
+                  title: const Text('About'),
+                  floating: true,
+                  snap: true,
+                ),
+                SliverPadding(
+                  padding: const EdgeInsets.all(16.0),
+                  sliver: SliverList(
+                    delegate: SliverChildListDelegate([
+                      Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Center(
-                    child: Icon(
-                      Icons.dashboard,
-                      size: 80,
+                  const SizedBox(height: 24),
+                  // App Icon
+                  Center(
+                    child: Image.asset(
+                      'assets/icons/app_icon.png',
+                      width: 120,
+                      height: 120,
+                      errorBuilder: (context, error, stackTrace) {
+                        return const Icon(
+                          Icons.dashboard,
+                          size: 120,
+                        );
+                      },
                     ),
                   ),
-                  const SizedBox(height: 16),
+                  const SizedBox(height: 24),
+                  // App Name
                   const Center(
                     child: Text(
                       'FlowDash',
@@ -70,19 +102,21 @@ class _AboutPageState extends ConsumerState<AboutPage> {
                       ),
                     ),
                   ),
+                  // Version
                   if (_packageInfo != null) ...[
                     const SizedBox(height: 8),
                     Center(
                       child: Text(
                         'Version ${_packageInfo!.version} (${_packageInfo!.buildNumber})',
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 16,
-                          color: Colors.grey,
+                          color: Colors.grey[600],
                         ),
                       ),
                     ),
                   ],
-                  const SizedBox(height: 24),
+                  const SizedBox(height: 32),
+                  // Description
                   const Text(
                     'Description',
                     style: TextStyle(
@@ -95,6 +129,7 @@ class _AboutPageState extends ConsumerState<AboutPage> {
                     'FlowDash is a mobile application for managing and automating your workflows and instances with ease.',
                     style: TextStyle(fontSize: 16),
                   ),
+                  // App Information
                   if (_packageInfo != null) ...[
                     const SizedBox(height: 24),
                     const Text(
@@ -109,11 +144,6 @@ class _AboutPageState extends ConsumerState<AboutPage> {
                       child: Column(
                         children: [
                           ListTile(
-                            title: const Text('Package Name'),
-                            subtitle: Text(_packageInfo!.packageName),
-                          ),
-                          const Divider(),
-                          ListTile(
                             title: const Text('Version'),
                             subtitle: Text(_packageInfo!.version),
                           ),
@@ -126,8 +156,48 @@ class _AboutPageState extends ConsumerState<AboutPage> {
                       ),
                     ),
                   ],
-                ],
-              ),
+                  // Legal Information
+                  const SizedBox(height: 24),
+                  const Text(
+                    'Legal',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Card(
+                    child: Column(
+                      children: [
+                        ListTile(
+                          leading: const Icon(Icons.copyright),
+                          title: const Text('Copyright'),
+                          subtitle: Text(
+                            '© ${DateTime.now().year} FlowDash. All rights reserved.',
+                            style: const TextStyle(fontSize: 14),
+                          ),
+                        ),
+                        const Divider(),
+                        ListTile(
+                          leading: const Icon(Icons.code),
+                          title: const Text('Open Source Licenses'),
+                          subtitle: const Text(
+                            'View licenses for open source software used in this app',
+                            style: TextStyle(fontSize: 14),
+                          ),
+                          trailing: const Icon(Icons.chevron_right),
+                          onTap: () => _showLicenses(context),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 32),
+                      ],
+                      ),
+                    ]),
+                  ),
+                ),
+              ],
             ),
     );
   }

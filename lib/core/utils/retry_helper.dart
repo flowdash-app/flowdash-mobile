@@ -5,9 +5,39 @@ import 'package:flowdash_mobile/core/utils/logger.dart';
 class RetryHelper {
   static final Logger _logger = AppLogger.getLogger('RetryHelper');
 
-  /// Checks if an error is non-retryable (e.g., DNS/connection errors)
+  /// Checks if an error is non-retryable (e.g., DNS/connection errors, auth errors, parsing errors)
   static bool _isNonRetryableError(dynamic error) {
+    // Type cast errors and format errors should not be retried
+    // These are data parsing issues, not network issues
+    if (error is TypeError || error is FormatException) {
+      return true;
+    }
+    
+    // Get error string once for all checks
+    final errorString = error.toString().toLowerCase();
+    
+    // Check for type cast errors in the error message
+    if (errorString.contains('type') && 
+        (errorString.contains('is not a subtype') || 
+         errorString.contains('type cast'))) {
+      return true;
+    }
+    
+    // Check if it's a DioException with connection error type
     if (error is DioException) {
+      // Check for authentication errors (401) - these should not be retried
+      if (error.response?.statusCode == 401) {
+        return true;
+      }
+      
+      // Check for client errors (4xx) - these are usually not retryable
+      final statusCode = error.response?.statusCode;
+      if (statusCode != null && statusCode >= 400 && statusCode < 500) {
+        // 401 is already handled above, but other 4xx errors should also not be retried
+        // (except maybe 408 Request Timeout, but that's handled by connectionTimeout)
+        return true;
+      }
+      
       // Connection errors, DNS failures, and connection timeouts
       // should not be retried as they won't resolve by retrying
       switch (error.type) {
@@ -17,19 +47,43 @@ class RetryHelper {
         case DioExceptionType.unknown:
           // Check if it's a DNS/connection error by examining the error message
           final errorMessage = error.message?.toLowerCase() ?? '';
-          final errorString = error.toString().toLowerCase();
+          // Also check the wrapped error if it exists
+          final wrappedError = error.error?.toString().toLowerCase() ?? '';
           if (errorMessage.contains('failed host lookup') ||
               errorMessage.contains('no address associated with hostname') ||
               errorMessage.contains('connection error') ||
+              errorMessage.contains('connection errored') ||
               errorString.contains('failed host lookup') ||
-              errorString.contains('no address associated with hostname')) {
+              errorString.contains('no address associated with hostname') ||
+              wrappedError.contains('failed host lookup') ||
+              wrappedError.contains('no address associated with hostname')) {
             return true;
           }
           break;
         default:
           break;
       }
+      
+      // Check if the wrapped error is a NetworkException with connection error message
+      if (error.error != null) {
+        final wrappedErrorString = error.error.toString().toLowerCase();
+        if (wrappedErrorString.contains('failed host lookup') ||
+            wrappedErrorString.contains('no address associated with hostname') ||
+            wrappedErrorString.contains('connection errored') ||
+            wrappedErrorString.contains('unauthorized')) {
+          return true;
+        }
+      }
     }
+    
+    // Also check the error message directly for connection/unauthorized errors
+    if (errorString.contains('failed host lookup') ||
+        errorString.contains('no address associated with hostname') ||
+        errorString.contains('connection errored: failed host lookup') ||
+        errorString.contains('unauthorized')) {
+      return true;
+    }
+    
     return false;
   }
 

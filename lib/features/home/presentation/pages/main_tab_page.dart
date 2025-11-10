@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:flowdash_mobile/core/routing/app_router.dart';
 import 'package:flowdash_mobile/features/home/presentation/pages/home_tab_content.dart';
 import 'package:flowdash_mobile/features/workflows/presentation/pages/workflows_page.dart';
 import 'package:flowdash_mobile/features/instances/presentation/pages/instances_page.dart';
@@ -21,13 +20,11 @@ class MainTabPage extends ConsumerStatefulWidget {
 
 class _MainTabPageState extends ConsumerState<MainTabPage> {
   late int _currentIndex;
-  late final PageController _pageController;
 
   @override
   void initState() {
     super.initState();
     _currentIndex = widget.initialIndex;
-    _pageController = PageController(initialPage: widget.initialIndex);
   }
 
   @override
@@ -35,14 +32,7 @@ class _MainTabPageState extends ConsumerState<MainTabPage> {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.initialIndex != widget.initialIndex) {
       _currentIndex = widget.initialIndex;
-      _pageController.jumpToPage(widget.initialIndex);
     }
-  }
-
-  @override
-  void dispose() {
-    _pageController.dispose();
-    super.dispose();
   }
 
   void _onTabTapped(int index) {
@@ -51,7 +41,6 @@ class _MainTabPageState extends ConsumerState<MainTabPage> {
     setState(() {
       _currentIndex = index;
     });
-    _pageController.jumpToPage(index);
 
     // Log tab change analytics
     final analytics = ref.read(analyticsServiceProvider);
@@ -63,30 +52,13 @@ class _MainTabPageState extends ConsumerState<MainTabPage> {
         'tab_name': tabNames[index],
       },
     );
-
-    // Navigate to corresponding route
-    switch (index) {
-      case 0:
-        const HomeRoute().go(context);
-        break;
-      case 1:
-        const HomeWorkflowsRoute().go(context);
-        break;
-      case 2:
-        const HomeInstancesRoute().go(context);
-        break;
-      case 3:
-        const HomeSettingsRoute().go(context);
-        break;
-    }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: PageView(
-        controller: _pageController,
-        physics: const NeverScrollableScrollPhysics(), // Disable swipe
+      body: IndexedStack(
+        index: _currentIndex,
         children: const [
           HomeTabContent(),
           WorkflowsPage(),
@@ -98,6 +70,24 @@ class _MainTabPageState extends ConsumerState<MainTabPage> {
         currentIndex: _currentIndex,
         onTap: _onTabTapped,
         type: BottomNavigationBarType.fixed,
+        selectedItemColor: Theme.of(context).colorScheme.primary,
+        unselectedItemColor: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
+        selectedFontSize: 14,
+        unselectedFontSize: 12,
+        selectedIconTheme: IconThemeData(
+          color: Theme.of(context).colorScheme.primary,
+          size: 28,
+        ),
+        unselectedIconTheme: IconThemeData(
+          color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
+          size: 24,
+        ),
+        selectedLabelStyle: const TextStyle(
+          fontWeight: FontWeight.bold,
+        ),
+        unselectedLabelStyle: const TextStyle(
+          fontWeight: FontWeight.normal,
+        ),
         items: const [
           BottomNavigationBarItem(
             icon: Icon(Icons.home),

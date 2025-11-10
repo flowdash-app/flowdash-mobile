@@ -4,10 +4,12 @@ import 'package:flowdash_mobile/features/auth/presentation/pages/login_page.dart
 import 'package:flowdash_mobile/features/auth/presentation/pages/splash_page.dart';
 import 'package:flowdash_mobile/features/home/presentation/pages/main_tab_page.dart';
 import 'package:flowdash_mobile/features/onboarding/presentation/pages/onboarding_page.dart';
+import 'package:flowdash_mobile/features/instances/presentation/pages/add_instance_page.dart';
 import 'package:flowdash_mobile/features/settings/presentation/pages/privacy_policy_page.dart';
 import 'package:flowdash_mobile/features/settings/presentation/pages/terms_of_service_page.dart';
 import 'package:flowdash_mobile/features/settings/presentation/pages/analytics_consent_page.dart';
 import 'package:flowdash_mobile/features/settings/presentation/pages/about_page.dart';
+import 'package:flowdash_mobile/features/workflows/presentation/pages/workflow_details_page.dart';
 
 part 'app_router.g.dart';
 
@@ -41,7 +43,7 @@ class HomeRoute extends GoRouteData with $HomeRoute {
 
   @override
   Widget build(BuildContext context, GoRouterState state) =>
-      const MainTabPage(initialIndex: 0);
+      const MainTabPage(key: ValueKey('main_tab_page'), initialIndex: 0);
 }
 
 // Nested tab routes
@@ -51,7 +53,7 @@ class HomeWorkflowsRoute extends GoRouteData with $HomeWorkflowsRoute {
 
   @override
   Widget build(BuildContext context, GoRouterState state) =>
-      const MainTabPage(initialIndex: 1);
+      const MainTabPage(key: ValueKey('main_tab_page'), initialIndex: 1);
 }
 
 @TypedGoRoute<HomeInstancesRoute>(path: '/home/instances')
@@ -60,7 +62,16 @@ class HomeInstancesRoute extends GoRouteData with $HomeInstancesRoute {
 
   @override
   Widget build(BuildContext context, GoRouterState state) =>
-      const MainTabPage(initialIndex: 2);
+      const MainTabPage(key: ValueKey('main_tab_page'), initialIndex: 2);
+}
+
+@TypedGoRoute<AddInstanceRoute>(path: '/instances/add')
+class AddInstanceRoute extends GoRouteData with $AddInstanceRoute {
+  const AddInstanceRoute();
+
+  @override
+  Widget build(BuildContext context, GoRouterState state) =>
+      const AddInstancePage();
 }
 
 @TypedGoRoute<HomeSettingsRoute>(path: '/home/settings')
@@ -69,7 +80,7 @@ class HomeSettingsRoute extends GoRouteData with $HomeSettingsRoute {
 
   @override
   Widget build(BuildContext context, GoRouterState state) =>
-      const MainTabPage(initialIndex: 3);
+      const MainTabPage(key: ValueKey('main_tab_page'), initialIndex: 3);
 }
 
 // Standalone routes for deep linking (will redirect to tab view)
@@ -89,6 +100,27 @@ class InstancesRoute extends GoRouteData with $InstancesRoute {
   @override
   Widget build(BuildContext context, GoRouterState state) =>
       const MainTabPage(initialIndex: 2);
+}
+
+@TypedGoRoute<WorkflowDetailsRoute>(path: '/workflows/:workflowId')
+class WorkflowDetailsRoute extends GoRouteData with $WorkflowDetailsRoute {
+  final String workflowId;
+  final String instanceId;
+  final String instanceName;
+
+  const WorkflowDetailsRoute({
+    required this.workflowId,
+    required this.instanceId,
+    required this.instanceName,
+  });
+
+  @override
+  Widget build(BuildContext context, GoRouterState state) =>
+      WorkflowDetailsPage(
+        workflowId: workflowId,
+        instanceId: instanceId,
+        instanceName: instanceName,
+      );
 }
 
 // Settings nested routes

@@ -1,7 +1,6 @@
 import 'package:dio/dio.dart';
 import 'package:logging/logging.dart';
 import 'package:flowdash_mobile/core/utils/logger.dart';
-import 'package:flowdash_mobile/core/utils/retry_helper.dart';
 import 'package:flowdash_mobile/core/analytics/analytics_service.dart';
 import 'package:flowdash_mobile/core/storage/local_storage.dart';
 import 'package:flowdash_mobile/features/instances/domain/entities/instance.dart';
@@ -34,9 +33,11 @@ class InstanceRepositoryImpl implements InstanceRepository {
     _logger.info('getInstances: Entry');
 
     try {
-      // Try local cache first
+      // Try local cache first (for optimistic updates)
       final cached = await _localDataSource.getInstances();
-      if (cached != null) {
+      // Only use cache if it exists and is not empty
+      // Empty cache might mean no instances were set up yet
+      if (cached != null && cached.isNotEmpty) {
         _logger.info('getInstances: Success (cached)');
         await _analytics.logSuccess(
             action: 'get_instances', parameters: {'source': 'cache'});
@@ -44,11 +45,9 @@ class InstanceRepositoryImpl implements InstanceRepository {
         return cached;
       }
 
-      // Fetch from remote with retry
-      final instances = await RetryHelper.retry(
-        operation: () =>
-            _remoteDataSource.getInstances(cancelToken: cancelToken),
-        maxAttempts: 3,
+      // Fetch from remote
+      final instances = await _remoteDataSource.getInstances(
+        cancelToken: cancelToken,
       );
 
       await _localDataSource.cacheInstances(instances);
@@ -80,10 +79,9 @@ class InstanceRepositoryImpl implements InstanceRepository {
     _logger.info('getInstanceById: Entry - $id');
 
     try {
-      final instance = await RetryHelper.retry(
-        operation: () =>
-            _remoteDataSource.getInstanceById(id, cancelToken: cancelToken),
-        maxAttempts: 3,
+      final instance = await _remoteDataSource.getInstanceById(
+        id,
+        cancelToken: cancelToken,
       );
 
       _logger.info('getInstanceById: Success - $id');
@@ -106,6 +104,57 @@ class InstanceRepositoryImpl implements InstanceRepository {
   }
 
   @override
+  Future<Instance> createInstance({
+    required String name,
+    required String url,
+    String? apiKey,
+    CancelToken? cancelToken,
+  }) async {
+    final trace = _analytics.startTrace('create_instance');
+    trace?.start();
+
+    _logger.info('createInstance: Entry - name: $name, url: $url');
+
+    try {
+      final instance = await _remoteDataSource.createInstance(
+        name: name,
+        url: url,
+        apiKey: apiKey,
+        cancelToken: cancelToken,
+      );
+
+      // Optimistic update: immediately cache the new instance
+      // Get existing instances from cache and add the new one
+      final cachedInstances = await _localDataSource.getInstances() ?? [];
+      final updatedInstances = [...cachedInstances, instance];
+      await _localDataSource.cacheInstances(updatedInstances);
+
+      // Set flag that user has set an instance
+      await _localStorage.setHasSetInstance(true);
+
+      _logger.info('createInstance: Success - ${instance.id}');
+      await _analytics.logSuccess(
+        action: 'create_instance',
+        parameters: {
+          'instance_id': instance.id,
+          'name': name,
+        },
+      );
+      trace?.stop();
+      return instance;
+    } catch (e, stackTrace) {
+      await _analytics.logFailure(
+        action: 'create_instance',
+        error: e.toString(),
+        parameters: {'name': name, 'url': url},
+      );
+      trace?.stop();
+      _logger.severe('createInstance: Failure', e, stackTrace);
+      rethrow;
+    }
+  }
+
+  @override
   Future<void> toggleInstance(String id, bool enabled,
       {CancelToken? cancelToken}) async {
     final trace = _analytics.startTrace('toggle_instance');
@@ -114,10 +163,22 @@ class InstanceRepositoryImpl implements InstanceRepository {
     _logger.info('toggleInstance: Entry - $id, enabled: $enabled');
 
     try {
-      await RetryHelper.retry(
-        operation: () => _remoteDataSource.toggleInstance(id, enabled,
-            cancelToken: cancelToken),
-        maxAttempts: 3,
+      // Optimistic update: immediately update cache with new active state
+      final cachedInstances = await _localDataSource.getInstances() ?? [];
+      final updatedInstances = cachedInstances.map((instance) {
+        if (instance.id == id) {
+          return instance.copyWith(active: enabled);
+        }
+        return instance;
+      }).toList();
+      await _localDataSource.cacheInstances(updatedInstances);
+      _logger.info('toggleInstance: Optimistic update applied - $id');
+
+      // Make API call
+      await _remoteDataSource.toggleInstance(
+        id,
+        enabled,
+        cancelToken: cancelToken,
       );
 
       // Set flag if instance is being enabled (user has set an instance)
@@ -125,7 +186,14 @@ class InstanceRepositoryImpl implements InstanceRepository {
         await _localStorage.setHasSetInstance(true);
       }
 
-      // Invalidate cache after toggle
+      // After successful API call, we want to fetch fresh data from server
+      // But we keep the optimistic cache so the UI updates immediately
+      // The provider invalidation will trigger a refetch, which will:
+      // 1. First return the optimistic cache (immediate UI update)
+      // 2. Then fetch from server in background to sync
+      // For now, we'll clear cache after a short delay to force server sync
+      // But actually, let's just clear it immediately and let provider fetch fresh
+      // The optimistic update already happened, so UI should update via provider invalidation
       await _localDataSource.clearCache();
 
       _logger.info('toggleInstance: Success - $id');
@@ -135,6 +203,8 @@ class InstanceRepositoryImpl implements InstanceRepository {
       );
       trace?.stop();
     } catch (e, stackTrace) {
+      // On error, revert optimistic update by clearing cache
+      await _localDataSource.clearCache();
       await _analytics.logFailure(
         action: 'toggle_instance',
         error: e.toString(),

@@ -209,7 +209,7 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage> {
                     borderRadius: BorderRadius.circular(4.0),
                     color: _currentPage == index
                         ? theme.colorScheme.primary
-                        : theme.colorScheme.primary.withOpacity(0.3),
+                        : theme.colorScheme.primary.withValues(alpha: 0.3),
                   ),
                 ),
               ),

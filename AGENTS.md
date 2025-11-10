@@ -716,6 +716,275 @@ Logger.root.level = Level.INFO; // Production
 - Include message
 - Include error/stack trace for failures
 
+## UI Components and Material Design
+
+### State Widgets (Empty, Loading, Error)
+
+#### When to Use Card Widgets vs Full-Page States
+
+**Card Widgets (EmptyStateCard, LoadingStateCard, ErrorStateCard):**
+- **ONLY** use in the main/home page (`home_tab_content.dart`)
+- Use when states need to appear inline with other content
+- Cards fit within scrollable content sections
+- Example: Empty state card in a workflows section on the home page
+
+**Full-Page Centered States:**
+- **MUST** use in dedicated pages (`workflows_page.dart`, `instances_page.dart`)
+- Use when the entire page content is in a single state
+- Center content vertically and horizontally
+- No card wrapper - direct Column/Center layout
+- Example: Full-page empty state in WorkflowsPage
+
+#### Implementation Pattern
+
+**Main Page (with cards):**
+```dart
+// In home_tab_content.dart
+workflowsAsync.when(
+  data: (workflows) => workflows.isEmpty
+      ? EmptyStateCard(
+          icon: Icons.work_outline,
+          title: 'No workflows found',
+          message: 'Create workflows...',
+        )
+      : ListView.builder(...),
+  loading: () => LoadingStateCard(message: 'Loading...'),
+  error: (error, stack) => ErrorStateCard(...),
+)
+```
+
+**Dedicated Page (full-page, no cards):**
+```dart
+// In workflows_page.dart or instances_page.dart
+workflowsAsync.when(
+  data: (workflows) => workflows.isEmpty
+      ? Center(
+          child: Padding(
+            padding: const EdgeInsets.all(32.0),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                Icon(Icons.work_outline, size: 64, color: Colors.grey[400]),
+                const SizedBox(height: 16),
+                const Text('No workflows found', ...),
+                const SizedBox(height: 8),
+                Text('Your active n8n instance...', ...),
+                const SizedBox(height: 24),
+                OutlinedButton.icon(...),
+              ],
+            ),
+          ),
+        )
+      : ListView.builder(...),
+  loading: () => const Center(
+    child: Column(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        CircularProgressIndicator(),
+        SizedBox(height: 16),
+        Text('Loading workflows...'),
+      ],
+    ),
+  ),
+  error: (error, stack) => Center(
+    child: Padding(
+      padding: const EdgeInsets.all(32.0),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(Icons.error_outline, size: 64, color: Colors.red[300]),
+          const SizedBox(height: 16),
+          const Text('Failed to load workflows', ...),
+          const SizedBox(height: 8),
+          Text(errorMessage, ...),
+          const SizedBox(height: 24),
+          ElevatedButton.icon(...),
+        ],
+      ),
+    ),
+  ),
+)
+```
+
+#### Rules
+
+1. **NEVER use card widgets in dedicated pages** - Always use full-page centered states
+2. **ONLY use card widgets in main/home page** - For inline content sections
+3. **Full-page states must be centered** - Use `Center` widget with `Column` inside
+4. **Consistent spacing** - Use 32px padding for full-page states, 16px for cards
+5. **Icon sizes** - 64px for full-page states, 48px for cards
+6. **Button types** - Use `ElevatedButton` for full-page states, `OutlinedButton` for cards
+
+### SliverAppBar (Material 3)
+
+Use `SliverAppBar` for scrollable app bars that follow Material 3 design guidelines:
+
+#### Basic Implementation
+
+```dart
+CustomScrollView(
+  slivers: [
+    SliverAppBar(
+      title: const Text('FlowDash'),
+      floating: true,
+      snap: true,
+      actions: [
+        IconButton(
+          icon: const Icon(Icons.refresh),
+          onPressed: () {
+            // Refresh action
+          },
+        ),
+      ],
+    ),
+    SliverList(
+      delegate: SliverChildBuilderDelegate(
+        (context, index) => ListTile(
+          title: Text('Item $index'),
+        ),
+        childCount: 20,
+      ),
+    ),
+  ],
+)
+```
+
+#### Material 3 Configuration
+
+```dart
+SliverAppBar(
+  title: const Text('FlowDash'),
+  floating: true,           // App bar appears when scrolling up
+  snap: true,                // Snap animation (Material 3)
+  pinned: false,             // Don't pin at top (use floating instead)
+  surfaceTintColor: Theme.of(context).colorScheme.surfaceContainerHighest,
+  shadowColor: Theme.of(context).colorScheme.shadow,
+  elevation: 0,              // Use surface tint instead of elevation
+  scrolledUnderElevation: 4, // Elevation when scrolled under
+  actions: [
+    // Action buttons
+  ],
+)
+```
+
+#### Common Patterns
+
+**With RefreshIndicator:**
+```dart
+RefreshIndicator(
+  onRefresh: () async {
+    ref.invalidate(dataProvider);
+  },
+  child: CustomScrollView(
+    slivers: [
+      SliverAppBar(
+        title: const Text('FlowDash'),
+        floating: true,
+        snap: true,
+      ),
+      // Content slivers
+    ],
+  ),
+)
+```
+
+**With Tabs:**
+```dart
+DefaultTabController(
+  length: 3,
+  child: CustomScrollView(
+    slivers: [
+      SliverAppBar(
+        title: const Text('FlowDash'),
+        floating: true,
+        snap: true,
+        bottom: const TabBar(
+          tabs: [
+            Tab(text: 'Home'),
+            Tab(text: 'Workflows'),
+            Tab(text: 'Instances'),
+          ],
+        ),
+      ),
+      // Content slivers
+    ],
+  ),
+)
+```
+
+**With Flexible Space:**
+```dart
+SliverAppBar(
+  expandedHeight: 200,
+  flexibleSpace: FlexibleSpaceBar(
+    title: const Text('FlowDash'),
+    background: Image.network(
+      'https://example.com/image.jpg',
+      fit: BoxFit.cover,
+    ),
+  ),
+  floating: true,
+  snap: true,
+)
+```
+
+#### Material 3 Best Practices
+
+1. **Use `floating: true`** for better scroll behavior
+2. **Use `snap: true`** for Material 3 snap animation
+3. **Set `elevation: 0`** and use `surfaceTintColor` instead
+4. **Use `scrolledUnderElevation`** for elevation when scrolled under
+5. **Avoid `pinned: true`** unless necessary - prefer floating behavior
+6. **Use `surfaceTintColor`** from theme for Material 3 surface tinting
+
+#### State Management Integration
+
+```dart
+class MyPage extends ConsumerWidget {
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final data = ref.watch(dataProvider);
+    
+    return CustomScrollView(
+      slivers: [
+        SliverAppBar(
+          title: const Text('FlowDash'),
+          floating: true,
+          snap: true,
+          actions: [
+            IconButton(
+              icon: const Icon(Icons.refresh),
+              onPressed: () => ref.invalidate(dataProvider),
+            ),
+          ],
+        ),
+        data.when(
+          data: (items) => SliverList(
+            delegate: SliverChildBuilderDelegate(
+              (context, index) => ListTile(
+                title: Text(items[index].name),
+              ),
+              childCount: items.length,
+            ),
+          ),
+          loading: () => const SliverFillRemaining(
+            child: Center(child: CircularProgressIndicator()),
+          ),
+          error: (error, stack) => SliverFillRemaining(
+            child: ErrorStateCard(
+              icon: Icons.error_outline,
+              title: 'Error',
+              message: error.toString(),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+```
+
 ## Code Organization
 
 ### Feature-Based Folder Structure

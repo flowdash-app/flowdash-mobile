@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flowdash_mobile/core/routing/app_router.dart';
 import 'package:flowdash_mobile/features/auth/presentation/providers/auth_provider.dart';
-import 'package:package_info_plus/package_info_plus.dart';
 
 class SettingsPage extends ConsumerStatefulWidget {
   const SettingsPage({super.key});
@@ -12,12 +11,9 @@ class SettingsPage extends ConsumerStatefulWidget {
 }
 
 class _SettingsPageState extends ConsumerState<SettingsPage> {
-  PackageInfo? _packageInfo;
-
   @override
   void initState() {
     super.initState();
-    _loadPackageInfo();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final analytics = ref.read(analyticsServiceProvider);
       analytics.logScreenView(
@@ -27,22 +23,10 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
     });
   }
 
-  Future<void> _loadPackageInfo() async {
-    try {
-      final packageInfo = await PackageInfo.fromPlatform();
-      setState(() {
-        _packageInfo = packageInfo;
-      });
-    } catch (e) {
-      // Ignore errors, will use fallback
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     final authState = ref.watch(authStateProvider);
     final analytics = ref.read(analyticsServiceProvider);
-    final version = _packageInfo?.version ?? '1.0.0';
 
     return Scaffold(
       appBar: AppBar(
@@ -124,24 +108,6 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                 parameters: {'action_type': 'view_about'},
               );
               const AboutRoute().push(context);
-            },
-          ),
-
-          // Licenses
-          ListTile(
-            leading: const Icon(Icons.code),
-            title: const Text('Open Source Licenses'),
-            trailing: const Icon(Icons.chevron_right),
-            onTap: () {
-              analytics.logEvent(
-                name: 'settings_action',
-                parameters: {'action_type': 'view_licenses'},
-              );
-              showLicensePage(
-                context: context,
-                applicationName: 'FlowDash',
-                applicationVersion: version,
-              );
             },
           ),
 

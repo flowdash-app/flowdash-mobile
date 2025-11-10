@@ -30,12 +30,18 @@ class _PrivacyPolicyPageState extends ConsumerState<PrivacyPolicyPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Privacy Policy'),
-      ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
+      body: CustomScrollView(
+        slivers: [
+          SliverAppBar(
+            title: const Text('Privacy Policy'),
+            floating: true,
+            snap: true,
+          ),
+          SliverPadding(
+            padding: const EdgeInsets.all(16.0),
+            sliver: SliverList(
+              delegate: SliverChildListDelegate([
+                Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const Text(
@@ -115,8 +121,12 @@ class _PrivacyPolicyPageState extends ConsumerState<PrivacyPolicyPage> {
               'If you have questions about this privacy policy, please contact us at support@flowdash.com.',
               style: TextStyle(fontSize: 16),
             ),
-          ],
-        ),
+              ],
+            ),
+              ]),
+            ),
+          ),
+        ],
       ),
     );
   }

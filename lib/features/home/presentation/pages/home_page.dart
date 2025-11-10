@@ -26,34 +26,6 @@ class _HomePageState extends ConsumerState<HomePage> {
     final authState = ref.watch(authStateProvider);
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('FlowDash'),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.refresh),
-            onPressed: () {
-              // ignore: unused_result
-              ref.refresh(workflowsProvider);
-              // ignore: unused_result
-              ref.refresh(instancesProvider);
-            },
-          ),
-          PopupMenuButton(
-            itemBuilder: (context) => [
-              PopupMenuItem(
-                child: const Text('Sign Out'),
-                onTap: () async {
-                  final repository = ref.read(authRepositoryProvider);
-                  await repository.signOut();
-                  if (context.mounted) {
-                    const LoginRoute().go(context);
-                  }
-                },
-              ),
-            ],
-          ),
-        ],
-      ),
       body: RefreshIndicator(
         onRefresh: () async {
           // ignore: unused_result
@@ -65,11 +37,43 @@ class _HomePageState extends ConsumerState<HomePage> {
             ref.read(instancesProvider.future),
           ]);
         },
-        child: SingleChildScrollView(
-          physics: const AlwaysScrollableScrollPhysics(),
-          child: Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: Column(
+        child: CustomScrollView(
+          slivers: [
+            SliverAppBar(
+              title: const Text('FlowDash'),
+              floating: true,
+              snap: true,
+              actions: [
+                IconButton(
+                  icon: const Icon(Icons.refresh),
+                  onPressed: () {
+                    // ignore: unused_result
+                    ref.refresh(workflowsProvider);
+                    // ignore: unused_result
+                    ref.refresh(instancesProvider);
+                  },
+                ),
+                PopupMenuButton(
+                  itemBuilder: (context) => [
+                    PopupMenuItem(
+                      child: const Text('Sign Out'),
+                      onTap: () async {
+                        final repository = ref.read(authRepositoryProvider);
+                        await repository.signOut();
+                        if (context.mounted) {
+                          const LoginRoute().go(context);
+                        }
+                      },
+                    ),
+                  ],
+                ),
+              ],
+            ),
+            SliverPadding(
+              padding: const EdgeInsets.all(16.0),
+              sliver: SliverList(
+                delegate: SliverChildListDelegate([
+                  Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 // User info
@@ -246,9 +250,12 @@ class _HomePageState extends ConsumerState<HomePage> {
                     ),
                   ),
                 ),
-              ],
+                  ],
+                  ),
+                ]),
+              ),
             ),
-          ),
+          ],
         ),
       ),
     );

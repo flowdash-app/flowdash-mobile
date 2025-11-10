@@ -43,12 +43,17 @@ class _AnalyticsConsentPageState extends ConsumerState<AnalyticsConsentPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Analytics & Privacy'),
-      ),
-      body: ListView(
-        padding: const EdgeInsets.all(16.0),
-        children: [
+      body: CustomScrollView(
+        slivers: [
+          SliverAppBar(
+            title: const Text('Analytics & Privacy'),
+            floating: true,
+            snap: true,
+          ),
+          SliverPadding(
+            padding: const EdgeInsets.all(16.0),
+            sliver: SliverList(
+              delegate: SliverChildListDelegate([
           const Text(
             'Analytics Data Collection',
             style: TextStyle(
@@ -98,6 +103,9 @@ class _AnalyticsConsentPageState extends ConsumerState<AnalyticsConsentPage> {
               const PrivacyPolicyRoute().push(context);
             },
             child: const Text('View Privacy Policy'),
+          ),
+              ]),
+            ),
           ),
         ],
       ),

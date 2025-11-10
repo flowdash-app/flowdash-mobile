@@ -11,11 +11,17 @@ class InstanceModel extends Instance {
   });
 
   factory InstanceModel.fromJson(Map<String, dynamic> json) {
+    // Backend returns 'enabled' but we use 'active' internally
+    // Support both field names for compatibility
+    final active = json['enabled'] as bool? ?? 
+                   json['active'] as bool? ?? 
+                   false;
+    
     return InstanceModel(
       id: json['id'] as String,
       name: json['name'] as String,
       url: json['url'] as String,
-      active: json['active'] as bool? ?? false,
+      active: active,
       lastConnectedAt: json['lastConnectedAt'] != null
           ? DateTime.parse(json['lastConnectedAt'] as String)
           : null,

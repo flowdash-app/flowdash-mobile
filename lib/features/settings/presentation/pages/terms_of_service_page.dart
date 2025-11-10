@@ -31,12 +31,18 @@ class _TermsOfServicePageState extends ConsumerState<TermsOfServicePage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Terms of Service'),
-      ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
+      body: CustomScrollView(
+        slivers: [
+          SliverAppBar(
+            title: const Text('Terms of Service'),
+            floating: true,
+            snap: true,
+          ),
+          SliverPadding(
+            padding: const EdgeInsets.all(16.0),
+            sliver: SliverList(
+              delegate: SliverChildListDelegate([
+                Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const Text(
@@ -116,8 +122,12 @@ class _TermsOfServicePageState extends ConsumerState<TermsOfServicePage> {
               'We reserve the right to modify these terms at any time. Continued use of the service constitutes acceptance of modified terms.',
               style: TextStyle(fontSize: 16),
             ),
-          ],
-        ),
+              ],
+            ),
+              ]),
+            ),
+          ),
+        ],
       ),
     );
   }
