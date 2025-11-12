@@ -26,6 +26,7 @@ abstract class WorkflowRepository {
   Future<WorkflowExecution> getExecutionById({
     required String executionId,
     required String instanceId,
+    bool includeData = true,
     CancelToken? cancelToken,
   });
 }

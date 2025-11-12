@@ -9,6 +9,7 @@ import 'package:flowdash_mobile/features/workflows/domain/repositories/workflow_
 import 'package:flowdash_mobile/features/workflows/data/datasources/workflow_remote_datasource.dart';
 import 'package:flowdash_mobile/features/workflows/data/datasources/workflow_local_datasource.dart';
 import 'package:flowdash_mobile/features/workflows/data/models/workflow_model.dart';
+import 'package:flowdash_mobile/features/workflows/data/models/workflow_execution_model.dart';
 import 'package:flowdash_mobile/features/instances/domain/repositories/instance_repository.dart';
 
 class WorkflowRepositoryImpl implements WorkflowRepository {
@@ -43,7 +44,8 @@ class WorkflowRepositoryImpl implements WorkflowRepository {
         await _analytics.logSuccess(
             action: 'get_workflows', parameters: {'source': 'cache', 'count': cached.length});
         trace?.stop();
-        return cached;
+        // Convert WorkflowModel list to Workflow list
+        return cached.map((w) => w.toEntity()).toList();
       }
       
       // If cache is empty, clear it and fetch from remote
@@ -61,7 +63,7 @@ class WorkflowRepositoryImpl implements WorkflowRepository {
       }
 
       // Fetch workflows from all instances and track which instance they belong to
-      final allWorkflows = <({Workflow workflow, String instanceId, String instanceName})>[];
+      final allWorkflows = <({WorkflowModel workflow, String instanceId, String instanceName})>[];
       for (final instance in instances) {
         try {
           final workflows = await _remoteDataSource.getWorkflows(
@@ -99,18 +101,8 @@ class WorkflowRepositoryImpl implements WorkflowRepository {
       });
 
       // Extract just the workflows for caching (without instance info)
-      // Convert to WorkflowModel for caching
-      final workflowsList = allWorkflows.map((w) {
-        final workflow = w.workflow;
-        return WorkflowModel(
-          id: workflow.id,
-          name: workflow.name,
-          active: workflow.active,
-          description: workflow.description,
-          updatedAt: workflow.updatedAt,
-          createdAt: workflow.createdAt,
-        );
-      }).toList();
+      // The workflows from remote are already WorkflowModel instances
+      final workflowsList = allWorkflows.map((w) => w.workflow).toList();
       await _localDataSource.cacheWorkflows(workflowsList);
       _logger.info(
           'getWorkflows: Success (remote) - ${allWorkflows.length} workflows from ${instances.length} instances');
@@ -119,7 +111,8 @@ class WorkflowRepositoryImpl implements WorkflowRepository {
         parameters: {'source': 'remote', 'count': allWorkflows.length, 'instances': instances.length},
       );
       trace?.stop();
-      return workflowsList;
+      // Convert WorkflowModel list to Workflow list for return
+      return workflowsList.map((w) => w.toEntity()).toList();
     } catch (e, stackTrace) {
       // Don't send business logic exceptions to Crashlytics
       final errorString = e.toString();
@@ -160,17 +153,20 @@ class WorkflowRepositoryImpl implements WorkflowRepository {
         cancelToken: cancelToken,
       );
 
-      _logger.info('getWorkflowsPaginated: Success - ${result.data.length} workflows, hasNext: ${result.nextCursor != null}');
+      // Convert WorkflowModel list to Workflow list
+      final workflows = result.data.map((w) => w.toEntity()).toList();
+
+      _logger.info('getWorkflowsPaginated: Success - ${workflows.length} workflows, hasNext: ${result.nextCursor != null}');
       await _analytics.logSuccess(
         action: 'get_workflows_paginated',
         parameters: {
           'instance_id': instanceId,
-          'count': result.data.length,
+          'count': workflows.length,
           'has_next': result.nextCursor != null,
         },
       );
       trace?.stop();
-      return result;
+      return (data: workflows, nextCursor: result.nextCursor);
     } catch (e, stackTrace) {
       await _analytics.logFailure(
         action: 'get_workflows_paginated',
@@ -203,7 +199,7 @@ class WorkflowRepositoryImpl implements WorkflowRepository {
             parameters: {'workflow_id': id, 'source': 'cache'},
           );
           trace?.stop();
-          return found;
+          return found.toEntity();
         } catch (e) {
           // Not found in cache, continue to search in fetched workflows
         }
@@ -252,6 +248,12 @@ class WorkflowRepositoryImpl implements WorkflowRepository {
 
     _logger.info('toggleWorkflow: Entry - $id, enabled: $enabled');
 
+    // Optimistically update cache for instant UI feedback
+    final cacheUpdated = await _localDataSource.updateWorkflow(id, enabled);
+    if (cacheUpdated) {
+      _logger.info('toggleWorkflow: Cache updated optimistically - $id');
+    }
+
     try {
       await _remoteDataSource.toggleWorkflow(
         id,
@@ -259,9 +261,9 @@ class WorkflowRepositoryImpl implements WorkflowRepository {
         cancelToken: cancelToken,
       );
 
-      // Invalidate cache after toggle
-      await _localDataSource.clearCache();
-
+      // Cache was already updated optimistically, so we're good
+      // If needed, we could fetch the workflow again to ensure consistency,
+      // but typically the server just confirms the toggle
       _logger.info('toggleWorkflow: Success - $id');
       await _analytics.logSuccess(
         action: 'toggle_workflow',
@@ -269,6 +271,11 @@ class WorkflowRepositoryImpl implements WorkflowRepository {
       );
       trace?.stop();
     } catch (e, stackTrace) {
+      // On failure, clear cache to ensure consistency
+      // This ensures we don't have stale optimistic data
+      await _localDataSource.clearCache();
+      _logger.info('toggleWorkflow: Cache cleared due to failure - $id');
+
       await _analytics.logFailure(
         action: 'toggle_workflow',
         error: e.toString(),
@@ -317,18 +324,21 @@ class WorkflowRepositoryImpl implements WorkflowRepository {
         cancelToken: cancelToken,
       );
 
-      _logger.info('getExecutions: Success - ${result.data.length} executions, hasNext: ${result.nextCursor != null}');
+      // Convert WorkflowExecutionModel list to WorkflowExecution list
+      final executions = result.data.map((e) => e.toEntity()).toList();
+
+      _logger.info('getExecutions: Success - ${executions.length} executions, hasNext: ${result.nextCursor != null}');
       await _analytics.logSuccess(
         action: 'get_executions',
         parameters: {
           'instance_id': instanceId,
           if (workflowId != null) 'workflow_id': workflowId,
-          'count': result.data.length,
+          'count': executions.length,
           'has_next': result.nextCursor != null,
         },
       );
       trace?.stop();
-      return result;
+      return (data: executions, nextCursor: result.nextCursor);
     } catch (e, stackTrace) {
       await _analytics.logFailure(
         action: 'get_executions',
@@ -348,20 +358,23 @@ class WorkflowRepositoryImpl implements WorkflowRepository {
   Future<WorkflowExecution> getExecutionById({
     required String executionId,
     required String instanceId,
+    bool includeData = true,
     CancelToken? cancelToken,
   }) async {
     final trace = _analytics.startTrace('get_execution_by_id');
     trace?.start();
 
-    _logger.info('getExecutionById: Entry - executionId: $executionId, instanceId: $instanceId');
+    _logger.info('getExecutionById: Entry - executionId: $executionId, instanceId: $instanceId, includeData: $includeData');
 
     try {
-      final execution = await _remoteDataSource.getExecutionById(
+      final executionModel = await _remoteDataSource.getExecutionById(
         executionId: executionId,
         instanceId: instanceId,
+        includeData: includeData,
         cancelToken: cancelToken,
       );
 
+      final execution = executionModel.toEntity();
       _logger.info('getExecutionById: Success - $executionId');
       await _analytics.logSuccess(
         action: 'get_execution_by_id',

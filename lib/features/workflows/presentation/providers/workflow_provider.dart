@@ -43,18 +43,21 @@ final workflowsProvider = FutureProvider<List<Workflow>>((ref) async {
 
 final workflowProvider =
     FutureProvider.family<Workflow, String>((ref, id) async {
-  // Keep the provider alive so it doesn't get disposed
-  // This ensures the data is cached and only refetched on explicit invalidation
+  // Note: FutureProvider (not autoDispose) already persists by default
+  // keepAlive() is redundant here but doesn't hurt - it ensures persistence
+  // even if the provider type changes in the future
   ref.keepAlive();
   
   final repository = ref.watch(workflowRepositoryProvider);
   final cancelToken = CancelToken();
 
-  // Only cancel if the provider is manually invalidated
-  // Since we're using keepAlive, this won't be called on normal disposal
+  // onDispose is called when:
+  // 1. Provider is invalidated (triggers refetch)
+  // 2. Provider dependencies change (triggers recomputation)
+  // With keepAlive(), it won't be called just because listeners are removed
   ref.onDispose(() {
     if (!cancelToken.isCancelled) {
-      cancelToken.cancel('Provider invalidated');
+      cancelToken.cancel('Provider invalidated or recomputed');
     }
   });
 
@@ -145,12 +148,19 @@ final executionsProvider = FutureProvider.family<({List<WorkflowExecution> data,
 });
 
 final executionProvider = FutureProvider.family<WorkflowExecution, ({String executionId, String instanceId})>((ref, params) async {
+  // Note: FutureProvider (not autoDispose) already persists by default
+  // keepAlive() ensures persistence even if provider type changes
+  // invalidate() will still trigger refetch (calls onDispose and recomputes)
+  ref.keepAlive();
+  
   final repository = ref.watch(workflowRepositoryProvider);
   final cancelToken = CancelToken();
 
+  // onDispose is called when provider is invalidated or recomputed
+  // With keepAlive(), it won't be called just because listeners are removed
   ref.onDispose(() {
     if (!cancelToken.isCancelled) {
-      cancelToken.cancel('Provider disposed');
+      cancelToken.cancel('Provider invalidated or recomputed');
     }
   });
 

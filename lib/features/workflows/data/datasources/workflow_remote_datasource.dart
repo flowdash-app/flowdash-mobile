@@ -2,6 +2,7 @@ import 'package:dio/dio.dart';
 import 'package:logging/logging.dart';
 import 'package:flowdash_mobile/core/utils/logger.dart';
 import 'package:flowdash_mobile/core/network/api_client_provider.dart';
+import 'package:flowdash_mobile/core/models/paginated_response.dart';
 import 'package:flowdash_mobile/features/workflows/data/models/workflow_model.dart';
 import 'package:flowdash_mobile/features/workflows/data/models/workflow_execution_model.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -54,39 +55,26 @@ class WorkflowRemoteDataSource {
       );
       
       // Handle paginated response structure
-      Map<String, dynamic> responseData;
-      if (response.data is Map) {
-        responseData = response.data as Map<String, dynamic>;
-      } else if (response.data is List) {
+      if (response.data is List) {
         // Legacy: direct list response (no pagination)
         final workflows = (response.data as List<dynamic>)
             .map((json) => WorkflowModel.fromJson(json as Map<String, dynamic>))
             .toList();
         _logger.info('getWorkflowsPaginated: Success (legacy format) - ${workflows.length} workflows');
         return (data: workflows, nextCursor: null);
+      } else if (response.data is Map) {
+        // Paginated response
+        final paginatedResponse = PaginatedResponse<WorkflowModel>.fromJson(
+          response.data as Map<String, dynamic>,
+          (json) => WorkflowModel.fromJson(json as Map<String, dynamic>),
+        );
+        _logger.info('getWorkflowsPaginated: Success - ${paginatedResponse.data.length} workflows, hasNext: ${paginatedResponse.nextCursor != null}');
+        return (data: paginatedResponse.data, nextCursor: paginatedResponse.nextCursor);
       } else {
         throw FormatException(
           'Unexpected response format: expected List or Map, got ${response.data.runtimeType}',
         );
       }
-
-      // Extract data array
-      List<dynamic> data;
-      if (responseData.containsKey('data')) {
-        data = responseData['data'] as List<dynamic>;
-      } else {
-        // Fallback for other response structures
-        data = [];
-      }
-
-      final workflows = data
-          .map((json) => WorkflowModel.fromJson(json as Map<String, dynamic>))
-          .toList();
-
-      final nextCursor = responseData['nextCursor'] as String?;
-
-      _logger.info('getWorkflowsPaginated: Success - ${workflows.length} workflows, hasNext: ${nextCursor != null}');
-      return (data: workflows, nextCursor: nextCursor);
     } catch (e, stackTrace) {
       _logger.severe('getWorkflowsPaginated: Failure', e, stackTrace);
       rethrow;
@@ -168,30 +156,19 @@ class WorkflowRemoteDataSource {
       );
 
       // Handle paginated response structure
-      Map<String, dynamic> responseData;
-      if (response.data is Map) {
-        responseData = response.data as Map<String, dynamic>;
-      } else {
+      if (response.data is! Map) {
         throw FormatException(
           'Unexpected response format: expected Map, got ${response.data.runtimeType}',
         );
       }
 
-      List<dynamic> executionsData;
-      if (responseData.containsKey('data')) {
-        executionsData = responseData['data'] as List<dynamic>;
-      } else {
-        executionsData = [];
-      }
+      final paginatedResponse = PaginatedResponse<WorkflowExecutionModel>.fromJson(
+        response.data as Map<String, dynamic>,
+        (json) => WorkflowExecutionModel.fromJson(json as Map<String, dynamic>),
+      );
 
-      final executions = executionsData
-          .map((json) => WorkflowExecutionModel.fromJson(json as Map<String, dynamic>))
-          .toList();
-
-      final nextCursor = responseData['nextCursor'] as String?;
-
-      _logger.info('getExecutions: Success - ${executions.length} executions, hasNext: ${nextCursor != null}');
-      return (data: executions, nextCursor: nextCursor);
+      _logger.info('getExecutions: Success - ${paginatedResponse.data.length} executions, hasNext: ${paginatedResponse.nextCursor != null}');
+      return (data: paginatedResponse.data, nextCursor: paginatedResponse.nextCursor);
     } catch (e, stackTrace) {
       _logger.severe('getExecutions: Failure', e, stackTrace);
       rethrow;
@@ -201,14 +178,19 @@ class WorkflowRemoteDataSource {
   Future<WorkflowExecutionModel> getExecutionById({
     required String executionId,
     required String instanceId,
+    bool includeData = true,
     CancelToken? cancelToken,
   }) async {
-    _logger.info('getExecutionById: Entry - executionId: $executionId, instanceId: $instanceId');
+    _logger.info('getExecutionById: Entry - executionId: $executionId, instanceId: $instanceId, includeData: $includeData');
 
     try {
-      final response = await _dio.get(
+      // Use POST with body for secure instance_id handling
+      final response = await _dio.post(
         '/workflows/executions/$executionId',
-        queryParameters: {'instance_id': instanceId},
+        data: {
+          'instance_id': instanceId,
+          'include_data': includeData,
+        },
         cancelToken: cancelToken,
       );
       final execution =

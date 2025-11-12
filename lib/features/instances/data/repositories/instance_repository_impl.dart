@@ -7,6 +7,7 @@ import 'package:flowdash_mobile/features/instances/domain/entities/instance.dart
 import 'package:flowdash_mobile/features/instances/domain/repositories/instance_repository.dart';
 import 'package:flowdash_mobile/features/instances/data/datasources/instance_remote_datasource.dart';
 import 'package:flowdash_mobile/features/instances/data/datasources/instance_local_datasource.dart';
+import 'package:flowdash_mobile/features/instances/data/models/instance_model.dart';
 
 class InstanceRepositoryImpl implements InstanceRepository {
   final InstanceRemoteDataSource _remoteDataSource;
@@ -42,15 +43,16 @@ class InstanceRepositoryImpl implements InstanceRepository {
         await _analytics.logSuccess(
             action: 'get_instances', parameters: {'source': 'cache'});
         trace?.stop();
-        return cached;
+        return cached.map((m) => m.toEntity()).toList();
       }
 
       // Fetch from remote
-      final instances = await _remoteDataSource.getInstances(
+      final instanceModels = await _remoteDataSource.getInstances(
         cancelToken: cancelToken,
       );
 
-      await _localDataSource.cacheInstances(instances);
+      await _localDataSource.cacheInstances(instanceModels);
+      final instances = instanceModels.map((m) => m.toEntity()).toList();
       _logger.info(
           'getInstances: Success (remote) - ${instances.length} instances');
       await _analytics.logSuccess(
@@ -79,7 +81,7 @@ class InstanceRepositoryImpl implements InstanceRepository {
     _logger.info('getInstanceById: Entry - $id');
 
     try {
-      final instance = await _remoteDataSource.getInstanceById(
+      final instanceModel = await _remoteDataSource.getInstanceById(
         id,
         cancelToken: cancelToken,
       );
@@ -90,7 +92,7 @@ class InstanceRepositoryImpl implements InstanceRepository {
         parameters: {'instance_id': id},
       );
       trace?.stop();
-      return instance;
+      return instanceModel.toEntity();
     } catch (e, stackTrace) {
       await _analytics.logFailure(
         action: 'get_instance_by_id',
@@ -116,7 +118,7 @@ class InstanceRepositoryImpl implements InstanceRepository {
     _logger.info('createInstance: Entry - name: $name, url: $url');
 
     try {
-      final instance = await _remoteDataSource.createInstance(
+      final instanceModel = await _remoteDataSource.createInstance(
         name: name,
         url: url,
         apiKey: apiKey,
@@ -126,12 +128,13 @@ class InstanceRepositoryImpl implements InstanceRepository {
       // Optimistic update: immediately cache the new instance
       // Get existing instances from cache and add the new one
       final cachedInstances = await _localDataSource.getInstances() ?? [];
-      final updatedInstances = [...cachedInstances, instance];
+      final updatedInstances = [...cachedInstances, instanceModel];
       await _localDataSource.cacheInstances(updatedInstances);
 
       // Set flag that user has set an instance
       await _localStorage.setHasSetInstance(true);
 
+      final instance = instanceModel.toEntity();
       _logger.info('createInstance: Success - ${instance.id}');
       await _analytics.logSuccess(
         action: 'create_instance',

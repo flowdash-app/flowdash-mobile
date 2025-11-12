@@ -7,6 +7,7 @@ import 'package:flowdash_mobile/features/auth/presentation/providers/auth_provid
 import 'package:flowdash_mobile/features/workflows/presentation/providers/workflow_provider.dart';
 import 'package:flowdash_mobile/features/workflows/domain/entities/workflow.dart';
 import 'package:flowdash_mobile/features/workflows/domain/entities/workflow_execution.dart';
+import 'package:flowdash_mobile/features/workflows/presentation/widgets/execution_details_bottom_sheet.dart';
 
 class WorkflowDetailsPage extends ConsumerStatefulWidget {
   final String workflowId;
@@ -27,6 +28,8 @@ class WorkflowDetailsPage extends ConsumerStatefulWidget {
 
 class _WorkflowDetailsPageState extends ConsumerState<WorkflowDetailsPage>
     with PaginationHelper<WorkflowExecution> {
+  int _executionLimit = 10; // Default limit
+
   @override
   void initState() {
     super.initState();
@@ -51,22 +54,33 @@ class _WorkflowDetailsPageState extends ConsumerState<WorkflowDetailsPage>
           instanceId: widget.instanceId,
           workflowId: widget.workflowId,
           status: null,
-          limit: 20,
+          limit: _executionLimit,
           cursor: cursor,
         ),
         onStateChanged: (state) => setState(() {}),
       );
     } else {
-      await this.loadInitial(
+      await loadInitial(
         fetchData: () => repository.getExecutions(
           instanceId: widget.instanceId,
           workflowId: widget.workflowId,
           status: null,
-          limit: 20,
+          limit: _executionLimit,
           cursor: null,
         ),
         onStateChanged: (state) => setState(() {}),
       );
+    }
+  }
+
+  void _onLimitChanged(int? newLimit) {
+    if (newLimit != null && newLimit != _executionLimit) {
+      setState(() {
+        _executionLimit = newLimit;
+      });
+      // Reset pagination and reload with new limit
+      initPagination();
+      _loadExecutions();
     }
   }
 
@@ -143,7 +157,6 @@ class _WorkflowDetailsPageState extends ConsumerState<WorkflowDetailsPage>
   @override
   Widget build(BuildContext context) {
     final workflowAsync = ref.watch(workflowProvider(widget.workflowId));
-
     return Scaffold(
       body: RefreshIndicator(
         onRefresh: () async {
@@ -172,7 +185,7 @@ class _WorkflowDetailsPageState extends ConsumerState<WorkflowDetailsPage>
                     onChanged: _handleToggle,
                   ),
                   loading: () => const SizedBox.shrink(),
-                  error: (_, __) => const SizedBox.shrink(),
+                  error: (_, _) => const SizedBox.shrink(),
                 ),
               ],
             ),
@@ -385,7 +398,7 @@ class _WorkflowDetailsPageState extends ConsumerState<WorkflowDetailsPage>
         ),
         
         // Execution History Section
-        _buildExecutionHistorySection(workflow),
+        _buildExecutionHistorySection(),
         
         // Bottom padding
         const SizedBox(height: 32),
@@ -445,26 +458,48 @@ class _WorkflowDetailsPageState extends ConsumerState<WorkflowDetailsPage>
     );
   }
 
-  Widget _buildExecutionHistorySection(Workflow workflow) {
-
+  Widget _buildExecutionHistorySection() {
     return Padding(
       padding: const EdgeInsets.fromLTRB(16.0, 8.0, 16.0, 16.0),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Icon(
-                Icons.history,
-                size: 20,
-                color: Colors.grey[700],
+              Row(
+                children: [
+                  Icon(
+                    Icons.history,
+                    size: 20,
+                    color: Colors.grey[700],
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    'Execution History',
+                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.bold,
+                        ),
+                  ),
+                ],
               ),
-              const SizedBox(width: 8),
-              Text(
-                'Execution History',
-                style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.bold,
-                    ),
+              // Limit dropdown
+              DropdownButton<int>(
+                value: _executionLimit,
+                items: const [
+                  DropdownMenuItem(value: 10, child: Text('10')),
+                  DropdownMenuItem(value: 20, child: Text('20')),
+                  DropdownMenuItem(value: 30, child: Text('30')),
+                  DropdownMenuItem(value: 50, child: Text('50')),
+                ],
+                onChanged: _onLimitChanged,
+                underline: Container(), // Remove default underline
+                icon: const Icon(Icons.arrow_drop_down, size: 20),
+                style: TextStyle(
+                  fontSize: 14,
+                  color: Theme.of(context).colorScheme.primary,
+                  fontWeight: FontWeight.w500,
+                ),
               ),
             ],
           ),
@@ -619,6 +654,7 @@ class _WorkflowDetailsPageState extends ConsumerState<WorkflowDetailsPage>
     return Card(
       margin: const EdgeInsets.only(bottom: 8.0),
       child: ListTile(
+        onTap: () => _showExecutionDetails(execution),
         leading: Icon(
           statusIcon,
           color: statusColor,
@@ -701,6 +737,39 @@ class _WorkflowDetailsPageState extends ConsumerState<WorkflowDetailsPage>
     } else {
       return '${duration.inHours}h ${duration.inMinutes % 60}m';
     }
+  }
+
+  void _showExecutionDetails(WorkflowExecution execution) {
+    final workflowAsync = ref.read(workflowProvider(widget.workflowId));
+    String? workflowName;
+    if (workflowAsync.hasValue) {
+      workflowName = workflowAsync.value!.name;
+    }
+
+    // Fetch the full execution by ID to get complete data (list executions may not include full data)
+    final fullExecutionAsync = ref.read(executionProvider((
+      executionId: execution.id,
+      instanceId: widget.instanceId,
+    )));
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      builder: (context) => fullExecutionAsync.when(
+        data: (fullExecution) => ExecutionDetailsBottomSheet(
+          executionId: fullExecution.id,
+          instanceId: widget.instanceId,
+          workflowName: workflowName,
+        ),
+        loading: () => const Center(child: CircularProgressIndicator()),
+        error: (error, stack) => ExecutionDetailsBottomSheet(
+          executionId: execution.id,
+          instanceId: widget.instanceId,
+          workflowName: workflowName,
+        ),
+      ),
+    );
   }
 }
 

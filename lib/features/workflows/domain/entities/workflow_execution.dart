@@ -1,3 +1,5 @@
+import 'package:flowdash_mobile/features/workflows/data/models/execution_data_models.dart';
+
 enum WorkflowExecutionStatus {
   success,
   error,
@@ -14,7 +16,7 @@ class WorkflowExecution {
   final DateTime? stoppedAt;
   final Duration? duration;
   final String? errorMessage;
-  final Map<String, dynamic>? data;
+  final ExecutionData? data;
 
   const WorkflowExecution({
     required this.id,
@@ -35,7 +37,7 @@ class WorkflowExecution {
     DateTime? stoppedAt,
     Duration? duration,
     String? errorMessage,
-    Map<String, dynamic>? data,
+    ExecutionData? data,
   }) {
     return WorkflowExecution(
       id: id ?? this.id,
