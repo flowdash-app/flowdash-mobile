@@ -7,6 +7,7 @@ import 'package:flowdash_mobile/features/workflows/data/datasources/workflow_rem
 import 'package:flowdash_mobile/features/workflows/data/datasources/workflow_local_datasource.dart';
 import 'package:flowdash_mobile/features/workflows/domain/entities/workflow.dart';
 import 'package:flowdash_mobile/features/workflows/domain/entities/workflow_execution.dart';
+import 'package:flowdash_mobile/features/workflows/domain/entities/workflow_with_instance.dart';
 import 'package:flowdash_mobile/features/instances/presentation/providers/instance_provider.dart';
 
 final workflowLocalDataSourceProvider =
@@ -42,22 +43,30 @@ final workflowsProvider = FutureProvider<List<Workflow>>((ref) async {
 
 final workflowProvider =
     FutureProvider.family<Workflow, String>((ref, id) async {
+  // Keep the provider alive so it doesn't get disposed
+  // This ensures the data is cached and only refetched on explicit invalidation
+  ref.keepAlive();
+  
   final repository = ref.watch(workflowRepositoryProvider);
   final cancelToken = CancelToken();
 
+  // Only cancel if the provider is manually invalidated
+  // Since we're using keepAlive, this won't be called on normal disposal
   ref.onDispose(() {
     if (!cancelToken.isCancelled) {
-      cancelToken.cancel('Provider disposed');
+      cancelToken.cancel('Provider invalidated');
     }
   });
 
+  // The repository will use cached data if available, or fetch from the list
   return repository.getWorkflowById(id, cancelToken: cancelToken);
 });
 
 // Provider that returns workflows with instance information for sorting and display
-final workflowsWithInstanceProvider = FutureProvider<List<({Workflow workflow, String instanceId, String instanceName})>>((ref) async {
+// This is the main provider used by both home page and workflows page
+final workflowsWithInstanceProvider = FutureProvider<List<WorkflowWithInstance>>((ref) async {
+  final workflowRepository = ref.watch(workflowRepositoryProvider);
   final instanceRepository = ref.watch(instanceRepositoryProvider);
-  final remoteDataSource = ref.watch(workflowRemoteDataSourceProvider);
   final cancelToken = CancelToken();
   
   ref.onDispose(() {
@@ -66,22 +75,28 @@ final workflowsWithInstanceProvider = FutureProvider<List<({Workflow workflow, S
     }
   });
   
-  final allInstances = await instanceRepository.getInstances();
+  // Get all instances
+  final allInstances = await instanceRepository.getInstances(cancelToken: cancelToken);
   if (allInstances.isEmpty) {
     return [];
   }
   
-  final allWorkflowsWithInstance = <({Workflow workflow, String instanceId, String instanceName})>[];
+  final allWorkflowsWithInstance = <WorkflowWithInstance>[];
   
-  // Fetch workflows from all instances
+  // Fetch workflows from all instances using the repository (which handles caching)
   for (final instance in allInstances) {
     try {
-      final instanceWorkflows = await remoteDataSource.getWorkflows(
+      // Use getWorkflowsPaginated to get workflows for this instance
+      // We'll fetch a reasonable limit (100) to get all workflows
+      final result = await workflowRepository.getWorkflowsPaginated(
         instanceId: instance.id,
+        limit: 100,
+        cursor: null,
         cancelToken: cancelToken,
       );
-      for (final workflow in instanceWorkflows) {
-        allWorkflowsWithInstance.add((
+      
+      for (final workflow in result.data) {
+        allWorkflowsWithInstance.add(WorkflowWithInstance(
           workflow: workflow,
           instanceId: instance.id,
           instanceName: instance.name,
@@ -89,6 +104,7 @@ final workflowsWithInstanceProvider = FutureProvider<List<({Workflow workflow, S
       }
     } catch (e) {
       // Skip instances that fail - log but continue
+      // The repository already handles logging
     }
   }
   

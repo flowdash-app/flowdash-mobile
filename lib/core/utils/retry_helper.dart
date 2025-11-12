@@ -38,6 +38,15 @@ class RetryHelper {
         return true;
       }
       
+      // Check for server errors (5xx) - these indicate backend issues that won't be fixed by retrying
+      // 502 Bad Gateway, 503 Service Unavailable, and 500 Internal Server Error should not be retried
+      // as they indicate configuration or infrastructure issues
+      if (statusCode != null && statusCode >= 500 && statusCode < 600) {
+        // Don't retry on server errors - they indicate backend configuration issues
+        // (e.g., n8n instance behind Cloudflare Access, backend misconfiguration)
+        return true;
+      }
+      
       // Connection errors, DNS failures, and connection timeouts
       // should not be retried as they won't resolve by retrying
       switch (error.type) {

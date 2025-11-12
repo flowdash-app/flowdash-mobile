@@ -224,7 +224,10 @@ class _InstancesPageState extends ConsumerState<InstancesPage> {
                           ),
                           const SizedBox(height: 24),
                           ElevatedButton.icon(
-                            onPressed: () => ref.invalidate(instancesProvider),
+                            onPressed: () {
+                              // Invalidate will immediately show loading state
+                              ref.invalidate(instancesProvider);
+                            },
                             icon: const Icon(Icons.refresh),
                             label: const Text('Retry'),
                           ),

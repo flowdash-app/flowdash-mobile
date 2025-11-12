@@ -1,165 +1,29 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flowdash_mobile/core/routing/app_router.dart';
-import 'package:flowdash_mobile/core/utils/pagination_helper.dart';
 import 'package:flowdash_mobile/features/auth/presentation/providers/auth_provider.dart';
-import 'package:flowdash_mobile/features/instances/presentation/providers/instance_provider.dart';
-import 'package:flowdash_mobile/features/workflows/domain/entities/workflow.dart';
 import 'package:flowdash_mobile/features/workflows/presentation/providers/workflow_provider.dart';
 import 'package:flowdash_mobile/features/workflows/presentation/widgets/workflow_list_tile.dart';
+import 'package:flowdash_mobile/features/workflows/domain/entities/workflow_with_instance.dart';
 
-// Data structure to hold workflow with instance info
-class WorkflowWithInstance {
-  final Workflow workflow;
-  final String instanceId;
-  final String instanceName;
-
-  const WorkflowWithInstance({
-    required this.workflow,
-    required this.instanceId,
-    required this.instanceName,
-  });
-}
-
-class _WorkflowsPageState extends ConsumerState<WorkflowsPage>
-    with PaginationHelper<WorkflowWithInstance> {
+class _WorkflowsPageState extends ConsumerState<WorkflowsPage> {
   @override
   void initState() {
     super.initState();
-    initPagination();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final analytics = ref.read(analyticsServiceProvider);
       analytics.logScreenView(
         screenName: 'workflows',
         screenClass: 'WorkflowsPage',
       );
-      _loadWorkflows();
     });
-  }
-
-  Future<void> _loadWorkflows({bool loadMore = false}) async {
-    final workflowRepository = ref.read(workflowRepositoryProvider);
-    final instanceRepository = ref.read(instanceRepositoryProvider);
-
-    if (loadMore) {
-      // For load more, we need to track cursors per instance
-      // This is complex, so for now we'll just fetch more from all instances
-      // TODO: Implement proper multi-instance pagination
-      await this.loadMore(
-        fetchData: (cursor) async {
-          // Get all instances
-          final instances = await instanceRepository.getInstances();
-          if (instances.isEmpty) {
-            return (data: <WorkflowWithInstance>[], nextCursor: null);
-          }
-
-          // Fetch workflows from all instances (with limit per instance)
-          final allWorkflows = <WorkflowWithInstance>[];
-          bool hasMore = false;
-
-          for (final instance in instances) {
-            try {
-              // Fetch next page for this instance
-              // Note: This is a simplified approach - ideally we'd track cursor per instance
-              final result = await workflowRepository.getWorkflowsPaginated(
-                instanceId: instance.id,
-                limit: 20,
-                cursor: null, // TODO: Track cursor per instance
-                cancelToken: null,
-              );
-
-              for (final workflow in result.data) {
-                allWorkflows.add(WorkflowWithInstance(
-                  workflow: workflow,
-                  instanceId: instance.id,
-                  instanceName: instance.name,
-                ));
-              }
-
-              if (result.nextCursor != null) {
-                hasMore = true;
-              }
-            } catch (e) {
-              // Continue with other instances
-            }
-          }
-
-          // Sort: by instance name, then by active status, then by name
-          allWorkflows.sort((a, b) {
-            final instanceCompare = a.instanceName.compareTo(b.instanceName);
-            if (instanceCompare != 0) return instanceCompare;
-
-            if (a.workflow.active != b.workflow.active) {
-              return b.workflow.active ? 1 : -1;
-            }
-
-            return a.workflow.name.compareTo(b.workflow.name);
-          });
-
-          return (data: allWorkflows, nextCursor: hasMore ? 'more' : null);
-        },
-        onStateChanged: (state) => setState(() {}),
-      );
-    } else {
-      await this.loadInitial(
-        fetchData: () async {
-          // Get all instances
-          final instances = await instanceRepository.getInstances();
-          if (instances.isEmpty) {
-            throw Exception('No instances found. Please add an instance first.');
-          }
-
-          // Fetch workflows from all instances (with limit per instance)
-          final allWorkflows = <WorkflowWithInstance>[];
-          bool hasMore = false;
-
-          for (final instance in instances) {
-            try {
-              final result = await workflowRepository.getWorkflowsPaginated(
-                instanceId: instance.id,
-                limit: 20,
-                cursor: null,
-                cancelToken: null,
-              );
-
-              for (final workflow in result.data) {
-                allWorkflows.add(WorkflowWithInstance(
-                  workflow: workflow,
-                  instanceId: instance.id,
-                  instanceName: instance.name,
-                ));
-              }
-
-              if (result.nextCursor != null) {
-                hasMore = true;
-              }
-            } catch (e) {
-              // Continue with other instances
-            }
-          }
-
-          // Sort: by instance name, then by active status, then by name
-          allWorkflows.sort((a, b) {
-            final instanceCompare = a.instanceName.compareTo(b.instanceName);
-            if (instanceCompare != 0) return instanceCompare;
-
-            if (a.workflow.active != b.workflow.active) {
-              return b.workflow.active ? 1 : -1;
-            }
-
-            return a.workflow.name.compareTo(b.workflow.name);
-          });
-
-          return (data: allWorkflows, nextCursor: hasMore ? 'more' : null);
-        },
-        onStateChanged: (state) => setState(() {}),
-      );
-    }
   }
 
 
   @override
   Widget build(BuildContext context) {
+    final workflowsAsync = ref.watch(workflowsWithInstanceProvider);
+
     return PopScope(
       canPop: false,
       onPopInvokedWithResult: (bool didPop, dynamic result) {
@@ -170,62 +34,11 @@ class _WorkflowsPageState extends ConsumerState<WorkflowsPage>
       child: Scaffold(
         body: RefreshIndicator(
           onRefresh: () async {
-            await this.refresh(
-              fetchData: () async {
-                final workflowRepository = ref.read(workflowRepositoryProvider);
-                final instanceRepository = ref.read(instanceRepositoryProvider);
-
-                // Get all instances
-                final instances = await instanceRepository.getInstances();
-                if (instances.isEmpty) {
-                  throw Exception('No instances found. Please add an instance first.');
-                }
-
-                // Fetch workflows from all instances
-                final allWorkflows = <WorkflowWithInstance>[];
-                bool hasMore = false;
-
-                for (final instance in instances) {
-                  try {
-                    final result = await workflowRepository.getWorkflowsPaginated(
-                      instanceId: instance.id,
-                      limit: 20,
-                      cursor: null,
-                      cancelToken: null,
-                    );
-
-                    for (final workflow in result.data) {
-                      allWorkflows.add(WorkflowWithInstance(
-                        workflow: workflow,
-                        instanceId: instance.id,
-                        instanceName: instance.name,
-                      ));
-                    }
-
-                    if (result.nextCursor != null) {
-                      hasMore = true;
-                    }
-                  } catch (e) {
-                    // Continue with other instances
-                  }
-                }
-
-                // Sort: by instance name, then by active status, then by name
-                allWorkflows.sort((a, b) {
-                  final instanceCompare = a.instanceName.compareTo(b.instanceName);
-                  if (instanceCompare != 0) return instanceCompare;
-
-                  if (a.workflow.active != b.workflow.active) {
-                    return b.workflow.active ? 1 : -1;
-                  }
-
-                  return a.workflow.name.compareTo(b.workflow.name);
-                });
-
-                return (data: allWorkflows, nextCursor: hasMore ? 'more' : null);
-              },
-              onStateChanged: (state) => setState(() {}),
-            );
+            // Clear cache and invalidate provider to force refresh
+            final workflowRepository = ref.read(workflowRepositoryProvider);
+            await workflowRepository.refreshWorkflows();
+            ref.invalidate(workflowsWithInstanceProvider);
+            await ref.read(workflowsWithInstanceProvider.future);
           },
           child: CustomScrollView(
             slivers: [
@@ -245,8 +58,36 @@ class _WorkflowsPageState extends ConsumerState<WorkflowsPage>
                 floating: true,
                 snap: true,
               ),
-              if (paginationState.isLoading && paginationState.items.isEmpty)
-                const SliverFillRemaining(
+              workflowsAsync.when(
+                data: (workflows) {
+                  if (workflows.isEmpty) {
+                    return SliverFillRemaining(
+                      child: _buildEmptyState(),
+                    );
+                  }
+                  // Create a snapshot to prevent race conditions during build
+                  final workflowsSnapshot = List<WorkflowWithInstance>.from(workflows);
+                  return SliverList(
+                    delegate: SliverChildBuilderDelegate(
+                      (context, index) {
+                        if (index >= workflowsSnapshot.length) {
+                          return const SizedBox.shrink();
+                        }
+                        final item = workflowsSnapshot[index];
+                        return WorkflowListTile(
+                          workflow: item.workflow,
+                          instanceId: item.instanceId,
+                          instanceName: item.instanceName,
+                          showInstanceName: true,
+                          showUpdatedDate: true,
+                          wrapInCard: true,
+                        );
+                      },
+                      childCount: workflowsSnapshot.length,
+                    ),
+                  );
+                },
+                loading: () => const SliverFillRemaining(
                   child: Center(
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
@@ -265,51 +106,11 @@ class _WorkflowsPageState extends ConsumerState<WorkflowsPage>
                       ],
                     ),
                   ),
-                )
-              else if (paginationState.hasError && paginationState.items.isEmpty)
-                SliverFillRemaining(
-                  child: _buildErrorState(),
-                )
-              else if (paginationState.items.isEmpty)
-                SliverFillRemaining(
-                  child: _buildEmptyState(),
-                )
-              else
-                SliverList(
-                  delegate: SliverChildBuilderDelegate(
-                    (context, index) {
-                      final item = paginationState.items[index];
-                      return WorkflowListTile(
-                        workflow: item.workflow,
-                        instanceId: item.instanceId,
-                        instanceName: item.instanceName,
-                        showInstanceName: true,
-                        showUpdatedDate: true,
-                        wrapInCard: true,
-                      );
-                    },
-                    childCount: paginationState.items.length + (paginationState.hasMore ? 1 : 0),
-                  ),
                 ),
-              if (paginationState.hasMore && !paginationState.isLoading)
-                SliverToBoxAdapter(
-                  child: Padding(
-                    padding: const EdgeInsets.all(16.0),
-                    child: OutlinedButton.icon(
-                      onPressed: paginationState.isLoadingMore
-                          ? null
-                          : () => _loadWorkflows(loadMore: true),
-                      icon: paginationState.isLoadingMore
-                          ? const SizedBox(
-                              width: 16,
-                              height: 16,
-                              child: CircularProgressIndicator(strokeWidth: 2),
-                            )
-                          : const Icon(Icons.refresh),
-                      label: Text(paginationState.isLoadingMore ? 'Loading...' : 'Load More'),
-                    ),
-                  ),
+                error: (error, stack) => SliverFillRemaining(
+                  child: _buildErrorState(error),
                 ),
+              ),
             ],
           ),
         ),
@@ -318,7 +119,52 @@ class _WorkflowsPageState extends ConsumerState<WorkflowsPage>
   }
 
   Widget _buildEmptyState() {
-    final errorMessage = paginationState.error ?? '';
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(32.0),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            Icon(
+              Icons.work_outline,
+              size: 64,
+              color: Colors.grey[400],
+            ),
+            const SizedBox(height: 16),
+            const Text(
+              'No workflows found',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Your n8n instances don\'t have any workflows yet. Create workflows in your n8n instances and they will appear here.',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 14,
+                color: Colors.grey[600],
+              ),
+            ),
+            const SizedBox(height: 24),
+            OutlinedButton.icon(
+              onPressed: () {
+                ref.invalidate(workflowsWithInstanceProvider);
+              },
+              icon: const Icon(Icons.refresh),
+              label: const Text('Refresh'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildErrorState(Object error) {
+    final errorMessage = error.toString().replaceAll('Exception: ', '');
     final isNoInstances = errorMessage.contains('No instances found') ||
         errorMessage.contains('No active instance found');
 
@@ -377,50 +223,6 @@ class _WorkflowsPageState extends ConsumerState<WorkflowsPage>
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
             Icon(
-              Icons.work_outline,
-              size: 64,
-              color: Colors.grey[400],
-            ),
-            const SizedBox(height: 16),
-            const Text(
-              'No workflows found',
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'Your active n8n instance doesn\'t have any workflows yet. Create workflows in your n8n instance and they will appear here.',
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                fontSize: 14,
-                color: Colors.grey[600],
-              ),
-            ),
-            const SizedBox(height: 24),
-            OutlinedButton.icon(
-              onPressed: () => _loadWorkflows(),
-              icon: const Icon(Icons.refresh),
-              label: const Text('Refresh'),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildErrorState() {
-    final errorMessage = paginationState.error?.replaceAll('Exception: ', '') ?? 'Unknown error';
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(32.0),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          crossAxisAlignment: CrossAxisAlignment.center,
-          children: [
-            Icon(
               Icons.error_outline,
               size: 64,
               color: Colors.red[300],
@@ -445,7 +247,10 @@ class _WorkflowsPageState extends ConsumerState<WorkflowsPage>
             ),
             const SizedBox(height: 24),
             ElevatedButton.icon(
-              onPressed: () => _loadWorkflows(),
+              onPressed: () {
+                // Invalidate will immediately show loading state
+                ref.invalidate(workflowsWithInstanceProvider);
+              },
               icon: const Icon(Icons.refresh),
               label: const Text('Retry'),
             ),

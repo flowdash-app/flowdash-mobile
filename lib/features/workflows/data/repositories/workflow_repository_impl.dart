@@ -2,6 +2,7 @@ import 'package:dio/dio.dart';
 import 'package:logging/logging.dart';
 import 'package:flowdash_mobile/core/utils/logger.dart';
 import 'package:flowdash_mobile/core/analytics/analytics_service.dart';
+import 'package:flowdash_mobile/core/errors/exceptions.dart';
 import 'package:flowdash_mobile/features/workflows/domain/entities/workflow.dart';
 import 'package:flowdash_mobile/features/workflows/domain/entities/workflow_execution.dart';
 import 'package:flowdash_mobile/features/workflows/domain/repositories/workflow_repository.dart';
@@ -37,12 +38,18 @@ class WorkflowRepositoryImpl implements WorkflowRepository {
     try {
       // Try local cache first
       final cached = await _localDataSource.getWorkflows();
-      if (cached != null) {
-        _logger.info('getWorkflows: Success (cached)');
+      if (cached != null && cached.isNotEmpty) {
+        _logger.info('getWorkflows: Success (cached) - ${cached.length} workflows');
         await _analytics.logSuccess(
-            action: 'get_workflows', parameters: {'source': 'cache'});
+            action: 'get_workflows', parameters: {'source': 'cache', 'count': cached.length});
         trace?.stop();
         return cached;
+      }
+      
+      // If cache is empty, clear it and fetch from remote
+      if (cached != null && cached.isEmpty) {
+        _logger.info('getWorkflows: Cache is empty, clearing and fetching from remote');
+        await _localDataSource.clearCache();
       }
 
       // Get all instances to fetch workflows from all of them
@@ -185,19 +192,47 @@ class WorkflowRepositoryImpl implements WorkflowRepository {
     _logger.info('getWorkflowById: Entry - $id');
 
     try {
-      final workflow = await _remoteDataSource.getWorkflowById(
-        id,
-        cancelToken: cancelToken,
-      );
+      // First, try to find the workflow in the cached list
+      final cached = await _localDataSource.getWorkflows();
+      if (cached != null) {
+        try {
+          final found = cached.firstWhere((w) => w.id == id);
+          _logger.info('getWorkflowById: Success (cached) - $id');
+          await _analytics.logSuccess(
+            action: 'get_workflow_by_id',
+            parameters: {'workflow_id': id, 'source': 'cache'},
+          );
+          trace?.stop();
+          return found;
+        } catch (e) {
+          // Not found in cache, continue to search in fetched workflows
+        }
+      }
 
-      _logger.info('getWorkflowById: Success - $id');
-      await _analytics.logSuccess(
-        action: 'get_workflow_by_id',
-        parameters: {'workflow_id': id},
-      );
-      trace?.stop();
-      return workflow;
+      // If not in cache, fetch all workflows and find the one we need
+      // The backend doesn't have a /workflows/{id} endpoint, so we need to search
+      final allWorkflows = await getWorkflows(cancelToken: cancelToken);
+      try {
+        final found = allWorkflows.firstWhere((w) => w.id == id);
+        _logger.info('getWorkflowById: Success (from list) - $id');
+        await _analytics.logSuccess(
+          action: 'get_workflow_by_id',
+          parameters: {'workflow_id': id, 'source': 'list'},
+        );
+        trace?.stop();
+        return found;
+      } catch (e) {
+        // Not found in fetched workflows either
+      }
+
+      // Workflow not found
+      throw NotFoundException('Workflow not found: $id');
     } catch (e, stackTrace) {
+      if (e is NotFoundException) {
+        // Don't log NotFoundException as a failure - it's expected
+        trace?.stop();
+        rethrow;
+      }
       await _analytics.logFailure(
         action: 'get_workflow_by_id',
         error: e.toString(),

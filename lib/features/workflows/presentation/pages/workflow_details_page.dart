@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flowdash_mobile/core/utils/pagination_helper.dart';
+import 'package:flowdash_mobile/core/utils/pagination_state.dart';
+import 'package:flowdash_mobile/core/errors/exceptions.dart';
 import 'package:flowdash_mobile/features/auth/presentation/providers/auth_provider.dart';
 import 'package:flowdash_mobile/features/workflows/presentation/providers/workflow_provider.dart';
 import 'package:flowdash_mobile/features/workflows/domain/entities/workflow.dart';
@@ -96,12 +98,23 @@ class _WorkflowDetailsPageState extends ConsumerState<WorkflowDetailsPage>
     return '${date.day}/${date.month}/${date.year} at ${date.hour.toString().padLeft(2, '0')}:${date.minute.toString().padLeft(2, '0')}';
   }
 
+  bool _isNotFoundError(AsyncValue<Workflow> state) {
+    if (!state.hasError) return false;
+    final error = state.error;
+    if (error is NotFoundException) return true;
+    final errorString = error.toString().toLowerCase();
+    return errorString.contains('not found') || errorString.contains('404');
+  }
+
   Future<void> _handleToggle(bool value) async {
     final repository = ref.read(workflowRepositoryProvider);
     try {
       await repository.toggleWorkflow(widget.workflowId, value);
-      // Invalidate providers to refresh data
-      ref.invalidate(workflowProvider(widget.workflowId));
+      // Invalidate providers to refresh data (only if not a 404 error)
+      final currentState = ref.read(workflowProvider(widget.workflowId));
+      if (!_isNotFoundError(currentState)) {
+        ref.invalidate(workflowProvider(widget.workflowId));
+      }
       ref.invalidate(workflowsProvider);
       ref.invalidate(workflowsWithInstanceProvider);
       
@@ -134,9 +147,17 @@ class _WorkflowDetailsPageState extends ConsumerState<WorkflowDetailsPage>
     return Scaffold(
       body: RefreshIndicator(
         onRefresh: () async {
-          ref.invalidate(workflowProvider(widget.workflowId));
-          await ref.read(workflowProvider(widget.workflowId).future);
-          _loadExecutions();
+          // Don't refresh if the current state is a 404 error
+          if (!_isNotFoundError(workflowAsync)) {
+            // Clear cache to force fresh fetch
+            final repository = ref.read(workflowRepositoryProvider);
+            await repository.refreshWorkflows();
+            // Invalidate provider to trigger refetch with fresh data
+            ref.invalidate(workflowProvider(widget.workflowId));
+            await ref.read(workflowProvider(widget.workflowId).future);
+            // Reload executions
+            _loadExecutions();
+          }
         },
         child: CustomScrollView(
           slivers: [
@@ -177,6 +198,10 @@ class _WorkflowDetailsPageState extends ConsumerState<WorkflowDetailsPage>
               ),
               error: (error, stack) {
                 final errorMessage = error.toString().replaceAll('Exception: ', '');
+                final isNotFound = error is NotFoundException || 
+                    errorMessage.toLowerCase().contains('not found') ||
+                    errorMessage.contains('404');
+                
                 return SliverFillRemaining(
                   child: Center(
                     child: Padding(
@@ -186,36 +211,43 @@ class _WorkflowDetailsPageState extends ConsumerState<WorkflowDetailsPage>
                         crossAxisAlignment: CrossAxisAlignment.center,
                         children: [
                           Icon(
-                            Icons.error_outline,
+                            isNotFound ? Icons.search_off : Icons.error_outline,
                             size: 64,
-                            color: Colors.red[300],
+                            color: isNotFound ? Colors.orange[300] : Colors.red[300],
                           ),
                           const SizedBox(height: 16),
-                          const Text(
-                            'Failed to load workflow',
+                          Text(
+                            isNotFound ? 'Workflow not found' : 'Failed to load workflow',
                             textAlign: TextAlign.center,
-                            style: TextStyle(
+                            style: const TextStyle(
                               fontSize: 20,
                               fontWeight: FontWeight.bold,
                             ),
                           ),
                           const SizedBox(height: 8),
                           Text(
-                            errorMessage,
+                            isNotFound 
+                                ? 'This workflow may have been deleted or the ID is incorrect.'
+                                : errorMessage,
                             textAlign: TextAlign.center,
                             style: TextStyle(
                               fontSize: 14,
                               color: Colors.grey[600],
                             ),
                           ),
-                          const SizedBox(height: 24),
-                          ElevatedButton.icon(
-                            onPressed: () {
-                              ref.invalidate(workflowProvider(widget.workflowId));
-                            },
-                            icon: const Icon(Icons.refresh),
-                            label: const Text('Retry'),
-                          ),
+                          if (!isNotFound) ...[
+                            const SizedBox(height: 24),
+                            ElevatedButton.icon(
+                              onPressed: () {
+                                // Only invalidate if not a 404 error
+                                if (!_isNotFoundError(workflowAsync)) {
+                                  ref.invalidate(workflowProvider(widget.workflowId));
+                                }
+                              },
+                              icon: const Icon(Icons.refresh),
+                              label: const Text('Retry'),
+                            ),
+                          ],
                         ],
                       ),
                     ),
@@ -470,7 +502,17 @@ class _WorkflowDetailsPageState extends ConsumerState<WorkflowDetailsPage>
                   ),
                   const SizedBox(height: 8),
                   OutlinedButton.icon(
-                    onPressed: () => _loadExecutions(),
+                    onPressed: () {
+                      // Reset state to loading immediately
+                      updatePaginationState(PaginationState<WorkflowExecution>(
+                        isLoading: true,
+                        items: [],
+                        nextCursor: null,
+                      ));
+                      setState(() {});
+                      // Then load data
+                      _loadExecutions();
+                    },
                     icon: const Icon(Icons.refresh),
                     label: const Text('Retry'),
                   ),

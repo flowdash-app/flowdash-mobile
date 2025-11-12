@@ -31,7 +31,7 @@ class _HomeTabContentState extends ConsumerState<HomeTabContent> {
 
   @override
   Widget build(BuildContext context) {
-    final workflowsAsync = ref.watch(workflowsProvider);
+    final workflowsAsync = ref.watch(workflowsWithInstanceProvider);
     final instancesAsync = ref.watch(instancesProvider);
     final authState = ref.watch(authStateProvider);
 
@@ -45,12 +45,12 @@ class _HomeTabContentState extends ConsumerState<HomeTabContent> {
           await instanceRepository.refreshInstances();
           
           // Invalidate providers to trigger refresh from server
-          ref.invalidate(workflowsProvider);
+          ref.invalidate(workflowsWithInstanceProvider);
           ref.invalidate(instancesProvider);
           
           // Wait for both providers to complete their fetch from server
           await Future.wait([
-            ref.read(workflowsProvider.future),
+            ref.read(workflowsWithInstanceProvider.future),
             ref.read(instancesProvider.future),
           ]);
         },
@@ -64,7 +64,7 @@ class _HomeTabContentState extends ConsumerState<HomeTabContent> {
                 IconButton(
                   icon: const Icon(Icons.refresh),
                   onPressed: () {
-                    ref.invalidate(workflowsProvider);
+                    ref.invalidate(workflowsWithInstanceProvider);
                     ref.invalidate(instancesProvider);
                   },
                 ),
@@ -144,9 +144,11 @@ class _HomeTabContentState extends ConsumerState<HomeTabContent> {
                           child: Column(
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              ...workflows.take(5).map((workflow) {
+                              ...workflows.take(5).map((workflowWithInstance) {
                                 return WorkflowListTile(
-                                  workflow: workflow,
+                                  workflow: workflowWithInstance.workflow,
+                                  instanceId: workflowWithInstance.instanceId,
+                                  instanceName: workflowWithInstance.instanceName,
                                   showInstanceName: false,
                                   showUpdatedDate: false,
                                   wrapInCard: false,
@@ -279,7 +281,7 @@ class _HomeTabContentState extends ConsumerState<HomeTabContent> {
                                         // Invalidate to force refresh from server
                                         ref.invalidate(instancesProvider);
                                         // Also refresh workflows since active instance changed
-                                        ref.invalidate(workflowsProvider);
+                                        ref.invalidate(workflowsWithInstanceProvider);
                                       } catch (e) {
                                         if (context.mounted) {
                                           ScaffoldMessenger.of(context)
