@@ -1,6 +1,6 @@
 class AppConstants {
   // API Configuration
-  static const String apiBaseUrl = 'https://gnxrltdn-8000.euw.devtunnels.ms/api/v1/';
+  static const String apiBaseUrl = 'https://6qq92m70-8000.euw.devtunnels.ms/api/v1/';
   static const Duration connectTimeout = Duration(seconds: 30);
   static const Duration receiveTimeout = Duration(seconds: 30);
 

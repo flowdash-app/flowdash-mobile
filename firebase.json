@@ -1,1 +1,29 @@
-{"flutter":{"platforms":{"android":{"default":{"projectId":"flowdash-dev","appId":"1:463589212979:android:0637f39f1e433afdf3f446","fileOutput":"android/app/google-services.json"}},"dart":{"lib/firebase_options.dart":{"projectId":"flowdash-dev","configurations":{"android":"1:463589212979:android:0637f39f1e433afdf3f446"}}}}}}
+{
+  "flutter": {
+    "platforms": {
+      "android": {
+        "default": {
+          "projectId": "flowdash-dev",
+          "appId": "1:463589212979:android:0637f39f1e433afdf3f446",
+          "fileOutput": "android/app/google-services.json"
+        }
+      },
+      "ios": {
+        "default": {
+          "projectId": "flowdash-dev",
+          "appId": "1:463589212979:ios:bb43c2377c845648f3f446",
+          "fileOutput": "ios/Runner/GoogleService-Info.plist"
+        }
+      },
+      "dart": {
+        "lib/firebase_options.dart": {
+          "projectId": "flowdash-dev",
+          "configurations": {
+            "android": "1:463589212979:android:0637f39f1e433afdf3f446",
+            "ios": "1:463589212979:ios:bb43c2377c845648f3f446"
+          }
+        }
+      }
+    }
+  }
+}
