@@ -75,37 +75,30 @@ class FlowDashApp extends ConsumerWidget {
     // Set user ID when auth state changes
     // Using ref.listen ensures proper subscription management - Riverpod
     // automatically cancels the subscription when the widget is disposed
-    ref.listen<AsyncValue<dynamic>>(
-      authStateProvider,
-      (previous, next) {
-        next.whenData((user) async {
-          if (user != null) {
-            analytics.setUserId(user.id);
+    ref.listen<AsyncValue<dynamic>>(authStateProvider, (previous, next) {
+      next.whenData((user) async {
+        if (user != null) {
+          analytics.setUserId(user.id);
 
-            // Register device token if notifications are enabled
-            final notificationSettings =
-                await FirebaseMessaging.instance.getNotificationSettings();
-            if (notificationSettings.authorizationStatus ==
-                AuthorizationStatus.authorized) {
-              // User has granted notification permissions, register device token
-              await pushNotificationService.registerDeviceToken();
-            }
-          } else {
-            analytics.setUserId(null);
+          // Register device token if notifications are enabled
+          final notificationSettings = await FirebaseMessaging.instance.getNotificationSettings();
+          if (notificationSettings.authorizationStatus == AuthorizationStatus.authorized) {
+            // User has granted notification permissions, register device token
+            await pushNotificationService.registerDeviceToken();
           }
-        });
-      },
-    );
+        } else {
+          analytics.setUserId(null);
+        }
+      });
+    });
 
     // Also register device token on app startup if user is already logged in
     // This ensures last_used_at is updated even if user doesn't log in/out
     final currentAuthState = ref.read(authStateProvider);
     currentAuthState.whenData((user) async {
       if (user != null) {
-        final notificationSettings =
-            await FirebaseMessaging.instance.getNotificationSettings();
-        if (notificationSettings.authorizationStatus ==
-            AuthorizationStatus.authorized) {
+        final notificationSettings = await FirebaseMessaging.instance.getNotificationSettings();
+        if (notificationSettings.authorizationStatus == AuthorizationStatus.authorized) {
           await pushNotificationService.registerDeviceToken();
         }
       }
