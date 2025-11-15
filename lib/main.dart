@@ -1,8 +1,10 @@
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_crashlytics/firebase_crashlytics.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:firebase_performance/firebase_performance.dart';
 import 'package:flowdash_mobile/core/analytics/analytics_consent_service.dart';
 import 'package:flowdash_mobile/core/notifications/push_notification_provider.dart';
+import 'package:flowdash_mobile/core/notifications/push_notification_service.dart';
 import 'package:flowdash_mobile/core/routing/router_config.dart';
 import 'package:flowdash_mobile/core/storage/local_storage.dart';
 import 'package:flowdash_mobile/core/utils/logger.dart';
@@ -21,6 +23,10 @@ void main() async {
 
   // Initialize Firebase
   await Firebase.initializeApp();
+
+  // Register background message handler (must be done before any other FCM operations)
+  // This handles notifications when the app is terminated
+  FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
 
   // Initialize Crashlytics
   FlutterError.onError = (errorDetails) {
@@ -69,14 +75,40 @@ class FlowDashApp extends ConsumerWidget {
     // Set user ID when auth state changes
     // Using ref.listen ensures proper subscription management - Riverpod
     // automatically cancels the subscription when the widget is disposed
-    ref.listen<AsyncValue<dynamic>>(authStateProvider, (previous, next) {
-      next.whenData((user) {
-        if (user != null) {
-          analytics.setUserId(user.id);
-        } else {
-          analytics.setUserId(null);
+    ref.listen<AsyncValue<dynamic>>(
+      authStateProvider,
+      (previous, next) {
+        next.whenData((user) async {
+          if (user != null) {
+            analytics.setUserId(user.id);
+
+            // Register device token if notifications are enabled
+            final notificationSettings =
+                await FirebaseMessaging.instance.getNotificationSettings();
+            if (notificationSettings.authorizationStatus ==
+                AuthorizationStatus.authorized) {
+              // User has granted notification permissions, register device token
+              await pushNotificationService.registerDeviceToken();
+            }
+          } else {
+            analytics.setUserId(null);
+          }
+        });
+      },
+    );
+
+    // Also register device token on app startup if user is already logged in
+    // This ensures last_used_at is updated even if user doesn't log in/out
+    final currentAuthState = ref.read(authStateProvider);
+    currentAuthState.whenData((user) async {
+      if (user != null) {
+        final notificationSettings =
+            await FirebaseMessaging.instance.getNotificationSettings();
+        if (notificationSettings.authorizationStatus ==
+            AuthorizationStatus.authorized) {
+          await pushNotificationService.registerDeviceToken();
         }
-      });
+      }
     });
 
     return MaterialApp.router(

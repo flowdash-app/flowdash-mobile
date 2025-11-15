@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flowdash_mobile/core/routing/app_router.dart';
 import 'package:flowdash_mobile/features/auth/presentation/providers/auth_provider.dart';
+import 'package:flowdash_mobile/core/device/device_provider.dart';
+import 'package:flowdash_mobile/features/devices/data/providers/device_provider.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
 
 class SettingsPage extends ConsumerStatefulWidget {
   const SettingsPage({super.key});
@@ -69,6 +72,37 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
 
           const Divider(),
 
+          // Push Notifications
+          FutureBuilder<NotificationSettings>(
+            future: FirebaseMessaging.instance.getNotificationSettings(),
+            builder: (context, snapshot) {
+              final isEnabled = snapshot.data?.authorizationStatus == AuthorizationStatus.authorized;
+              
+              return ListTile(
+                leading: Icon(
+                  Icons.notifications,
+                  color: isEnabled ? null : Colors.grey,
+                ),
+                title: const Text('Push Notifications'),
+                subtitle: Text(
+                  isEnabled
+                      ? 'Enabled • Device tokens are automatically removed after 30 days of inactivity'
+                      : 'Disabled • Enable in app settings',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: Colors.grey[600],
+                  ),
+                ),
+                trailing: Icon(
+                  isEnabled ? Icons.check_circle : Icons.cancel,
+                  color: isEnabled ? Colors.green : Colors.grey,
+                ),
+              );
+            },
+          ),
+
+          const Divider(),
+
           // Privacy Policy
           ListTile(
             leading: const Icon(Icons.privacy_tip),
@@ -125,6 +159,21 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                 name: 'settings_action',
                 parameters: {'action_type': 'sign_out'},
               );
+              
+              // Delete device token before signing out
+              try {
+                final deviceService = ref.read(deviceServiceProvider);
+                final deviceRepository = ref.read(deviceRepositoryProvider);
+                final deviceId = await deviceService.getDeviceId();
+                await deviceRepository.deleteDevice(deviceId: deviceId);
+              } catch (e) {
+                // Log error but don't block sign out
+                analytics.logFailure(
+                  action: 'delete_device_on_logout',
+                  error: e.toString(),
+                );
+              }
+              
               final repository = ref.read(authRepositoryProvider);
               await repository.signOut();
               if (context.mounted) {
