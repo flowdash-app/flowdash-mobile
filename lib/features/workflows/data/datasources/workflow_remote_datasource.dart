@@ -106,14 +106,18 @@ class WorkflowRemoteDataSource {
   Future<void> toggleWorkflow(
     String id,
     bool enabled, {
+    required String instanceId,
     CancelToken? cancelToken,
   }) async {
-    _logger.info('toggleWorkflow: Entry - $id, enabled: $enabled');
+    _logger.info('toggleWorkflow: Entry - $id, enabled: $enabled, instanceId: $instanceId');
 
     try {
-      await _dio.patch(
-        '/workflows/$id',
-        data: {'active': enabled},
+      await _dio.post(
+        '/workflows/$id/toggle',
+        queryParameters: {
+          'instance_id': instanceId,
+          'enabled': enabled,
+        },
         cancelToken: cancelToken,
       );
 

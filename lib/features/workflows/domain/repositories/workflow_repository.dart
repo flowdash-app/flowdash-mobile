@@ -13,7 +13,7 @@ abstract class WorkflowRepository {
   });
   Future<Workflow> getWorkflowById(String id, {CancelToken? cancelToken});
   Future<void> toggleWorkflow(String id, bool enabled,
-      {CancelToken? cancelToken});
+      {required String instanceId, CancelToken? cancelToken});
   Future<void> refreshWorkflows();
   Future<({List<WorkflowExecution> data, String? nextCursor})> getExecutions({
     required String instanceId,

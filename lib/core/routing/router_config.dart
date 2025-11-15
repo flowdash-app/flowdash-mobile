@@ -1,8 +1,36 @@
 import 'package:flowdash_mobile/core/routing/app_router.dart';
 import 'package:flowdash_mobile/core/storage/local_storage_provider.dart';
 import 'package:flowdash_mobile/features/auth/presentation/providers/auth_provider.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+
+// Global navigator key for push notifications
+final navigatorKey = GlobalKey<NavigatorState>();
+
+/// A Page that presents its child as a modal bottom sheet
+class BottomSheetPage<T> extends Page<T> {
+  final Widget child;
+  final bool isScrollControlled;
+  final bool useSafeArea;
+
+  const BottomSheetPage({
+    required this.child,
+    this.isScrollControlled = true,
+    this.useSafeArea = true,
+    super.key,
+  });
+
+  @override
+  Route<T> createRoute(BuildContext context) {
+    return ModalBottomSheetRoute<T>(
+      settings: this,
+      builder: (_) => child,
+      isScrollControlled: isScrollControlled,
+      useSafeArea: useSafeArea,
+    );
+  }
+}
 
 final routerProvider = Provider<GoRouter>((ref) {
   final authState = ref.watch(authStateProvider);
@@ -11,7 +39,25 @@ final routerProvider = Provider<GoRouter>((ref) {
   // The watch() call ensures router rebuilds when authState changes
 
   return GoRouter(
-    routes: $appRoutes,
+    navigatorKey: navigatorKey,
+    routes: [
+      // Filter out execution details route and add custom bottom sheet version
+      ...$appRoutes.where((route) => route != $executionDetailsRoute),
+      // Add custom execution details route with bottom sheet presentation
+      GoRoute(
+        path: '/executions/:executionId',
+        pageBuilder: (context, state) {
+          // Construct the typed route from state - it handles parameter parsing
+          final route = ExecutionDetailsRoute(
+            executionId: state.pathParameters['executionId']!,
+            instanceId: state.uri.queryParameters['instance-id'] ?? '',
+            workflowName: state.uri.queryParameters['workflow-name'],
+          );
+
+          return BottomSheetPage(key: state.pageKey, child: route.build(context, state));
+        },
+      ),
+    ],
     redirect: (context, state) {
       // Handle loading state - don't redirect while checking auth
       if (authState.isLoading) {

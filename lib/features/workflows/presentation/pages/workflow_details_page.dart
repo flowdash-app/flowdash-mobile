@@ -1,13 +1,14 @@
-import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:dio/dio.dart';
+import 'package:flowdash_mobile/core/errors/exceptions.dart';
+import 'package:flowdash_mobile/core/routing/app_router.dart';
 import 'package:flowdash_mobile/core/utils/pagination_helper.dart';
 import 'package:flowdash_mobile/core/utils/pagination_state.dart';
-import 'package:flowdash_mobile/core/errors/exceptions.dart';
 import 'package:flowdash_mobile/features/auth/presentation/providers/auth_provider.dart';
-import 'package:flowdash_mobile/features/workflows/presentation/providers/workflow_provider.dart';
 import 'package:flowdash_mobile/features/workflows/domain/entities/workflow.dart';
 import 'package:flowdash_mobile/features/workflows/domain/entities/workflow_execution.dart';
-import 'package:flowdash_mobile/features/workflows/presentation/widgets/execution_details_bottom_sheet.dart';
+import 'package:flowdash_mobile/features/workflows/presentation/providers/workflow_provider.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 class WorkflowDetailsPage extends ConsumerStatefulWidget {
   final String workflowId;
@@ -22,8 +23,7 @@ class WorkflowDetailsPage extends ConsumerStatefulWidget {
   });
 
   @override
-  ConsumerState<WorkflowDetailsPage> createState() =>
-      _WorkflowDetailsPageState();
+  ConsumerState<WorkflowDetailsPage> createState() => _WorkflowDetailsPageState();
 }
 
 class _WorkflowDetailsPageState extends ConsumerState<WorkflowDetailsPage>
@@ -36,10 +36,7 @@ class _WorkflowDetailsPageState extends ConsumerState<WorkflowDetailsPage>
     initPagination();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final analytics = ref.read(analyticsServiceProvider);
-      analytics.logScreenView(
-        screenName: 'workflow_details',
-        screenClass: 'WorkflowDetailsPage',
-      );
+      analytics.logScreenView(screenName: 'workflow_details', screenClass: 'WorkflowDetailsPage');
       // Load initial executions
       _loadExecutions();
     });
@@ -47,7 +44,7 @@ class _WorkflowDetailsPageState extends ConsumerState<WorkflowDetailsPage>
 
   Future<void> _loadExecutions({bool loadMore = false}) async {
     final repository = ref.read(workflowRepositoryProvider);
-    
+
     if (loadMore) {
       await this.loadMore(
         fetchData: (cursor) => repository.getExecutions(
@@ -123,33 +120,37 @@ class _WorkflowDetailsPageState extends ConsumerState<WorkflowDetailsPage>
   Future<void> _handleToggle(bool value) async {
     final repository = ref.read(workflowRepositoryProvider);
     try {
-      await repository.toggleWorkflow(widget.workflowId, value);
+      await repository.toggleWorkflow(widget.workflowId, value, instanceId: widget.instanceId);
       // Invalidate providers to refresh data (only if not a 404 error)
       final currentState = ref.read(workflowProvider(widget.workflowId));
       if (!_isNotFoundError(currentState)) {
         ref.invalidate(workflowProvider(widget.workflowId));
       }
       ref.invalidate(workflowsProvider);
-      ref.invalidate(workflowsWithInstanceProvider);
-      
+      ref.read(workflowsWithInstanceProvider.notifier).refresh();
+
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(
-              value ? 'Workflow enabled' : 'Workflow disabled',
-            ),
+            content: Text(value ? 'Workflow enabled' : 'Workflow disabled'),
             duration: const Duration(seconds: 2),
           ),
         );
       }
     } catch (e) {
+      // Ignore cancellation errors - they're expected when invalidating providers
+      if (e is DioException && e.type == DioExceptionType.cancel) {
+        return;
+      }
+      // Also check for cancellation in error message (for wrapped exceptions)
+      if (e.toString().contains('Request cancelled') ||
+          e.toString().contains('request cancelled')) {
+        return;
+      }
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red));
       }
     }
   }
@@ -180,10 +181,7 @@ class _WorkflowDetailsPageState extends ConsumerState<WorkflowDetailsPage>
               snap: true,
               actions: [
                 workflowAsync.when(
-                  data: (workflow) => Switch(
-                    value: workflow.active,
-                    onChanged: _handleToggle,
-                  ),
+                  data: (workflow) => Switch(value: workflow.active, onChanged: _handleToggle),
                   loading: () => const SizedBox.shrink(),
                   error: (_, _) => const SizedBox.shrink(),
                 ),
@@ -200,10 +198,7 @@ class _WorkflowDetailsPageState extends ConsumerState<WorkflowDetailsPage>
                       SizedBox(height: 16),
                       Text(
                         'Loading workflow...',
-                        style: TextStyle(
-                          fontSize: 14,
-                          color: Colors.grey,
-                        ),
+                        style: TextStyle(fontSize: 14, color: Colors.grey),
                       ),
                     ],
                   ),
@@ -211,10 +206,11 @@ class _WorkflowDetailsPageState extends ConsumerState<WorkflowDetailsPage>
               ),
               error: (error, stack) {
                 final errorMessage = error.toString().replaceAll('Exception: ', '');
-                final isNotFound = error is NotFoundException || 
+                final isNotFound =
+                    error is NotFoundException ||
                     errorMessage.toLowerCase().contains('not found') ||
                     errorMessage.contains('404');
-                
+
                 return SliverFillRemaining(
                   child: Center(
                     child: Padding(
@@ -232,21 +228,15 @@ class _WorkflowDetailsPageState extends ConsumerState<WorkflowDetailsPage>
                           Text(
                             isNotFound ? 'Workflow not found' : 'Failed to load workflow',
                             textAlign: TextAlign.center,
-                            style: const TextStyle(
-                              fontSize: 20,
-                              fontWeight: FontWeight.bold,
-                            ),
+                            style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
                           ),
                           const SizedBox(height: 8),
                           Text(
-                            isNotFound 
+                            isNotFound
                                 ? 'This workflow may have been deleted or the ID is incorrect.'
                                 : errorMessage,
                             textAlign: TextAlign.center,
-                            style: TextStyle(
-                              fontSize: 14,
-                              color: Colors.grey[600],
-                            ),
+                            style: TextStyle(fontSize: 14, color: Colors.grey[600]),
                           ),
                           if (!isNotFound) ...[
                             const SizedBox(height: 24),
@@ -286,29 +276,24 @@ class _WorkflowDetailsPageState extends ConsumerState<WorkflowDetailsPage>
               // Name
               Text(
                 workflow.name,
-                style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                      fontWeight: FontWeight.bold,
-                    ),
+                style: Theme.of(
+                  context,
+                ).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold),
               ),
               const SizedBox(height: 8),
-              
+
               // Status Badge
               Row(
                 children: [
                   Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 6,
-                    ),
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                     decoration: BoxDecoration(
                       color: workflow.active
                           ? Colors.green.withOpacity(0.1)
                           : Colors.grey.withOpacity(0.1),
                       borderRadius: BorderRadius.circular(16),
                       border: Border.all(
-                        color: workflow.active
-                            ? Colors.green
-                            : Colors.grey,
+                        color: workflow.active ? Colors.green : Colors.grey,
                         width: 1,
                       ),
                     ),
@@ -316,9 +301,7 @@ class _WorkflowDetailsPageState extends ConsumerState<WorkflowDetailsPage>
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         Icon(
-                          workflow.active
-                              ? Icons.play_circle_outline
-                              : Icons.pause_circle_outline,
+                          workflow.active ? Icons.play_circle_outline : Icons.pause_circle_outline,
                           size: 16,
                           color: workflow.active ? Colors.green : Colors.grey,
                         ),
@@ -337,36 +320,29 @@ class _WorkflowDetailsPageState extends ConsumerState<WorkflowDetailsPage>
                 ],
               ),
               const SizedBox(height: 16),
-              
+
               // Description
               if (workflow.description != null && workflow.description!.isNotEmpty) ...[
                 Text(
                   'Description',
                   style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                        fontWeight: FontWeight.w600,
-                        color: Colors.grey[700],
-                      ),
+                    fontWeight: FontWeight.w600,
+                    color: Colors.grey[700],
+                  ),
                 ),
                 const SizedBox(height: 4),
-                Text(
-                  workflow.description!,
-                  style: Theme.of(context).textTheme.bodyMedium,
-                ),
+                Text(workflow.description!, style: Theme.of(context).textTheme.bodyMedium),
                 const SizedBox(height: 16),
               ],
-              
+
               // Divider
               const Divider(),
               const SizedBox(height: 8),
-              
+
               // Instance Information
-              _buildInfoRow(
-                icon: Icons.cloud,
-                label: 'Instance',
-                value: widget.instanceName,
-              ),
+              _buildInfoRow(icon: Icons.cloud, label: 'Instance', value: widget.instanceName),
               const SizedBox(height: 12),
-              
+
               // Created Date
               if (workflow.createdAt != null)
                 _buildInfoRow(
@@ -376,7 +352,7 @@ class _WorkflowDetailsPageState extends ConsumerState<WorkflowDetailsPage>
                   subtitle: _formatDate(workflow.createdAt!),
                 ),
               if (workflow.createdAt != null) const SizedBox(height: 12),
-              
+
               // Updated Date
               if (workflow.updatedAt != null)
                 _buildInfoRow(
@@ -386,20 +362,16 @@ class _WorkflowDetailsPageState extends ConsumerState<WorkflowDetailsPage>
                   subtitle: _formatDate(workflow.updatedAt!),
                 ),
               if (workflow.updatedAt != null) const SizedBox(height: 12),
-              
+
               // Workflow ID
-              _buildInfoRow(
-                icon: Icons.tag,
-                label: 'ID',
-                value: workflow.id,
-              ),
+              _buildInfoRow(icon: Icons.tag, label: 'ID', value: workflow.id),
             ],
           ),
         ),
-        
+
         // Execution History Section
         _buildExecutionHistorySection(),
-        
+
         // Bottom padding
         const SizedBox(height: 32),
       ]),
@@ -415,11 +387,7 @@ class _WorkflowDetailsPageState extends ConsumerState<WorkflowDetailsPage>
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Icon(
-          icon,
-          size: 20,
-          color: Colors.grey[600],
-        ),
+        Icon(icon, size: 20, color: Colors.grey[600]),
         const SizedBox(width: 12),
         Expanded(
           child: Column(
@@ -434,22 +402,10 @@ class _WorkflowDetailsPageState extends ConsumerState<WorkflowDetailsPage>
                 ),
               ),
               const SizedBox(height: 2),
-              Text(
-                value,
-                style: const TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
+              Text(value, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500)),
               if (subtitle != null) ...[
                 const SizedBox(height: 2),
-                Text(
-                  subtitle,
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: Colors.grey[500],
-                  ),
-                ),
+                Text(subtitle, style: TextStyle(fontSize: 12, color: Colors.grey[500])),
               ],
             ],
           ),
@@ -469,17 +425,13 @@ class _WorkflowDetailsPageState extends ConsumerState<WorkflowDetailsPage>
             children: [
               Row(
                 children: [
-                  Icon(
-                    Icons.history,
-                    size: 20,
-                    color: Colors.grey[700],
-                  ),
+                  Icon(Icons.history, size: 20, color: Colors.grey[700]),
                   const SizedBox(width: 8),
                   Text(
                     'Execution History',
-                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                          fontWeight: FontWeight.bold,
-                        ),
+                    style: Theme.of(
+                      context,
+                    ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
                   ),
                 ],
               ),
@@ -506,10 +458,7 @@ class _WorkflowDetailsPageState extends ConsumerState<WorkflowDetailsPage>
           const SizedBox(height: 16),
           if (paginationState.isLoading && paginationState.items.isEmpty)
             const Center(
-              child: Padding(
-                padding: EdgeInsets.all(24.0),
-                child: CircularProgressIndicator(),
-              ),
+              child: Padding(padding: EdgeInsets.all(24.0), child: CircularProgressIndicator()),
             )
           else if (paginationState.hasError && paginationState.items.isEmpty)
             Container(
@@ -521,11 +470,7 @@ class _WorkflowDetailsPageState extends ConsumerState<WorkflowDetailsPage>
               ),
               child: Column(
                 children: [
-                  Icon(
-                    Icons.error_outline,
-                    size: 48,
-                    color: Colors.red[400],
-                  ),
+                  Icon(Icons.error_outline, size: 48, color: Colors.red[400]),
                   const SizedBox(height: 12),
                   Text(
                     'Failed to load executions',
@@ -539,11 +484,13 @@ class _WorkflowDetailsPageState extends ConsumerState<WorkflowDetailsPage>
                   OutlinedButton.icon(
                     onPressed: () {
                       // Reset state to loading immediately
-                      updatePaginationState(PaginationState<WorkflowExecution>(
-                        isLoading: true,
-                        items: [],
-                        nextCursor: null,
-                      ));
+                      updatePaginationState(
+                        PaginationState<WorkflowExecution>(
+                          isLoading: true,
+                          items: [],
+                          nextCursor: null,
+                        ),
+                      );
                       setState(() {});
                       // Then load data
                       _loadExecutions();
@@ -564,11 +511,7 @@ class _WorkflowDetailsPageState extends ConsumerState<WorkflowDetailsPage>
               ),
               child: Column(
                 children: [
-                  Icon(
-                    Icons.history,
-                    size: 48,
-                    color: Colors.grey[400],
-                  ),
+                  Icon(Icons.history, size: 48, color: Colors.grey[400]),
                   const SizedBox(height: 12),
                   Text(
                     'No executions yet',
@@ -582,10 +525,7 @@ class _WorkflowDetailsPageState extends ConsumerState<WorkflowDetailsPage>
                   Text(
                     'Workflow execution history will appear here once the workflow runs.',
                     textAlign: TextAlign.center,
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: Colors.grey[500],
-                    ),
+                    style: TextStyle(fontSize: 12, color: Colors.grey[500]),
                   ),
                 ],
               ),
@@ -655,10 +595,7 @@ class _WorkflowDetailsPageState extends ConsumerState<WorkflowDetailsPage>
       margin: const EdgeInsets.only(bottom: 8.0),
       child: ListTile(
         onTap: () => _showExecutionDetails(execution),
-        leading: Icon(
-          statusIcon,
-          color: statusColor,
-        ),
+        leading: Icon(statusIcon, color: statusColor),
         title: Row(
           children: [
             Container(
@@ -670,21 +607,14 @@ class _WorkflowDetailsPageState extends ConsumerState<WorkflowDetailsPage>
               ),
               child: Text(
                 statusText,
-                style: TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
-                  color: statusColor,
-                ),
+                style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: statusColor),
               ),
             ),
             if (execution.duration != null) ...[
               const SizedBox(width: 8),
               Text(
                 _formatDuration(execution.duration!),
-                style: TextStyle(
-                  fontSize: 12,
-                  color: Colors.grey[600],
-                ),
+                style: TextStyle(fontSize: 12, color: Colors.grey[600]),
               ),
             ],
           ],
@@ -696,20 +626,14 @@ class _WorkflowDetailsPageState extends ConsumerState<WorkflowDetailsPage>
               const SizedBox(height: 4),
               Text(
                 'Started: ${_formatDate(execution.startedAt!)}',
-                style: TextStyle(
-                  fontSize: 12,
-                  color: Colors.grey[600],
-                ),
+                style: TextStyle(fontSize: 12, color: Colors.grey[600]),
               ),
             ],
             if (execution.errorMessage != null) ...[
               const SizedBox(height: 4),
               Text(
                 execution.errorMessage!,
-                style: TextStyle(
-                  fontSize: 12,
-                  color: Colors.red[700],
-                ),
+                style: TextStyle(fontSize: 12, color: Colors.red[700]),
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
               ),
@@ -719,10 +643,7 @@ class _WorkflowDetailsPageState extends ConsumerState<WorkflowDetailsPage>
         trailing: execution.stoppedAt != null
             ? Text(
                 _formatDate(execution.stoppedAt!),
-                style: TextStyle(
-                  fontSize: 11,
-                  color: Colors.grey[500],
-                ),
+                style: TextStyle(fontSize: 11, color: Colors.grey[500]),
               )
             : null,
       ),
@@ -746,30 +667,11 @@ class _WorkflowDetailsPageState extends ConsumerState<WorkflowDetailsPage>
       workflowName = workflowAsync.value!.name;
     }
 
-    // Fetch the full execution by ID to get complete data (list executions may not include full data)
-    final fullExecutionAsync = ref.read(executionProvider((
+    // Navigate to execution details route (will show as bottom sheet)
+    ExecutionDetailsRoute(
       executionId: execution.id,
       instanceId: widget.instanceId,
-    )));
-
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      useSafeArea: true,
-      builder: (context) => fullExecutionAsync.when(
-        data: (fullExecution) => ExecutionDetailsBottomSheet(
-          executionId: fullExecution.id,
-          instanceId: widget.instanceId,
-          workflowName: workflowName,
-        ),
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (error, stack) => ExecutionDetailsBottomSheet(
-          executionId: execution.id,
-          instanceId: widget.instanceId,
-          workflowName: workflowName,
-        ),
-      ),
-    );
+      workflowName: workflowName,
+    ).push(context);
   }
 }
-

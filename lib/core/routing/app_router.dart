@@ -1,15 +1,16 @@
-import 'package:flutter/material.dart';
-import 'package:go_router/go_router.dart';
 import 'package:flowdash_mobile/features/auth/presentation/pages/login_page.dart';
 import 'package:flowdash_mobile/features/auth/presentation/pages/splash_page.dart';
 import 'package:flowdash_mobile/features/home/presentation/pages/main_tab_page.dart';
-import 'package:flowdash_mobile/features/onboarding/presentation/pages/onboarding_page.dart';
 import 'package:flowdash_mobile/features/instances/presentation/pages/add_instance_page.dart';
+import 'package:flowdash_mobile/features/onboarding/presentation/pages/onboarding_page.dart';
+import 'package:flowdash_mobile/features/settings/presentation/pages/about_page.dart';
+import 'package:flowdash_mobile/features/settings/presentation/pages/analytics_consent_page.dart';
 import 'package:flowdash_mobile/features/settings/presentation/pages/privacy_policy_page.dart';
 import 'package:flowdash_mobile/features/settings/presentation/pages/terms_of_service_page.dart';
-import 'package:flowdash_mobile/features/settings/presentation/pages/analytics_consent_page.dart';
-import 'package:flowdash_mobile/features/settings/presentation/pages/about_page.dart';
 import 'package:flowdash_mobile/features/workflows/presentation/pages/workflow_details_page.dart';
+import 'package:flowdash_mobile/features/workflows/presentation/widgets/execution_details_bottom_sheet.dart';
+import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 
 part 'app_router.g.dart';
 
@@ -70,8 +71,7 @@ class AddInstanceRoute extends GoRouteData with $AddInstanceRoute {
   const AddInstanceRoute();
 
   @override
-  Widget build(BuildContext context, GoRouterState state) =>
-      const AddInstancePage();
+  Widget build(BuildContext context, GoRouterState state) => const AddInstancePage();
 }
 
 @TypedGoRoute<HomeSettingsRoute>(path: '/home/settings')
@@ -89,8 +89,7 @@ class WorkflowsRoute extends GoRouteData with $WorkflowsRoute {
   const WorkflowsRoute();
 
   @override
-  Widget build(BuildContext context, GoRouterState state) =>
-      const MainTabPage(initialIndex: 1);
+  Widget build(BuildContext context, GoRouterState state) => const MainTabPage(initialIndex: 1);
 }
 
 @TypedGoRoute<InstancesRoute>(path: '/instances')
@@ -98,8 +97,7 @@ class InstancesRoute extends GoRouteData with $InstancesRoute {
   const InstancesRoute();
 
   @override
-  Widget build(BuildContext context, GoRouterState state) =>
-      const MainTabPage(initialIndex: 2);
+  Widget build(BuildContext context, GoRouterState state) => const MainTabPage(initialIndex: 2);
 }
 
 @TypedGoRoute<WorkflowDetailsRoute>(path: '/workflows/:workflowId')
@@ -115,12 +113,31 @@ class WorkflowDetailsRoute extends GoRouteData with $WorkflowDetailsRoute {
   });
 
   @override
-  Widget build(BuildContext context, GoRouterState state) =>
-      WorkflowDetailsPage(
-        workflowId: workflowId,
-        instanceId: instanceId,
-        instanceName: instanceName,
-      );
+  Widget build(BuildContext context, GoRouterState state) => WorkflowDetailsPage(
+    workflowId: workflowId,
+    instanceId: instanceId,
+    instanceName: instanceName,
+  );
+}
+
+@TypedGoRoute<ExecutionDetailsRoute>(path: '/executions/:executionId')
+class ExecutionDetailsRoute extends GoRouteData with $ExecutionDetailsRoute {
+  final String executionId;
+  final String instanceId;
+  final String? workflowName;
+
+  const ExecutionDetailsRoute({
+    required this.executionId,
+    required this.instanceId,
+    this.workflowName,
+  });
+
+  @override
+  Widget build(BuildContext context, GoRouterState state) => ExecutionDetailsBottomSheet(
+    executionId: executionId,
+    instanceId: instanceId,
+    workflowName: workflowName,
+  );
 }
 
 // Settings nested routes
@@ -129,8 +146,7 @@ class PrivacyPolicyRoute extends GoRouteData with $PrivacyPolicyRoute {
   const PrivacyPolicyRoute();
 
   @override
-  Widget build(BuildContext context, GoRouterState state) =>
-      const PrivacyPolicyPage();
+  Widget build(BuildContext context, GoRouterState state) => const PrivacyPolicyPage();
 }
 
 @TypedGoRoute<TermsOfServiceRoute>(path: '/terms-of-service')
@@ -138,8 +154,7 @@ class TermsOfServiceRoute extends GoRouteData with $TermsOfServiceRoute {
   const TermsOfServiceRoute();
 
   @override
-  Widget build(BuildContext context, GoRouterState state) =>
-      const TermsOfServicePage();
+  Widget build(BuildContext context, GoRouterState state) => const TermsOfServicePage();
 }
 
 @TypedGoRoute<AnalyticsConsentRoute>(path: '/analytics-consent')
@@ -147,8 +162,7 @@ class AnalyticsConsentRoute extends GoRouteData with $AnalyticsConsentRoute {
   const AnalyticsConsentRoute();
 
   @override
-  Widget build(BuildContext context, GoRouterState state) =>
-      const AnalyticsConsentPage();
+  Widget build(BuildContext context, GoRouterState state) => const AnalyticsConsentPage();
 }
 
 @TypedGoRoute<AboutRoute>(path: '/about')
@@ -156,6 +170,5 @@ class AboutRoute extends GoRouteData with $AboutRoute {
   const AboutRoute();
 
   @override
-  Widget build(BuildContext context, GoRouterState state) =>
-      const AboutPage();
+  Widget build(BuildContext context, GoRouterState state) => const AboutPage();
 }

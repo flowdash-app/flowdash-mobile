@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flowdash_mobile/core/notifications/push_notification_provider.dart';
 import 'package:flowdash_mobile/features/auth/presentation/providers/auth_provider.dart';
 import 'package:flowdash_mobile/features/instances/presentation/providers/instance_provider.dart';
 import 'package:flowdash_mobile/features/workflows/presentation/providers/workflow_provider.dart';
@@ -84,20 +85,34 @@ class _AddInstancePageState extends ConsumerState<AddInstancePage> {
             : _apiKeyController.text.trim(),
       );
 
-      // Optimistic update: invalidate providers to trigger refresh
-      // This will reload instances from server (which now includes the new one)
-      ref.invalidate(instancesProvider);
+      // Refresh providers to trigger reload from server (which now includes the new one)
+      await ref.read(instancesProvider.notifier).refresh();
       // Also reload workflows since a new instance might be active
       ref.invalidate(workflowsProvider);
 
       if (mounted) {
-        Navigator.of(context).pop(true);
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Instance added successfully'),
-            backgroundColor: Colors.green,
-          ),
+        // Check if this is the first instance and request notification permission
+        final instancesAsync = ref.read(instancesProvider);
+        final isFirstInstance = instancesAsync.maybeWhen(
+          data: (instances) => instances.length == 1,
+          orElse: () => false,
         );
+
+        if (isFirstInstance && mounted) {
+          // Request notification permission with rationale
+          final pushService = ref.read(pushNotificationServiceProvider);
+          await pushService.requestPermissionWithRationale(context);
+        }
+
+        if (mounted) {
+          Navigator.of(context).pop(true);
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Instance added successfully'),
+              backgroundColor: Colors.green,
+            ),
+          );
+        }
       }
     } catch (e) {
       if (mounted) {

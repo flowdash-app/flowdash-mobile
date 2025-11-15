@@ -1,8 +1,10 @@
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flowdash_mobile/core/routing/app_router.dart';
 import 'package:flowdash_mobile/features/workflows/domain/entities/workflow.dart';
 import 'package:flowdash_mobile/features/workflows/presentation/providers/workflow_provider.dart';
+import 'package:flowdash_mobile/features/instances/presentation/providers/instance_provider.dart';
 
 class WorkflowListTile extends ConsumerWidget {
   final Workflow workflow;
@@ -56,13 +58,56 @@ class WorkflowListTile extends ConsumerWidget {
       return;
     }
 
+    // Need instanceId to toggle workflow
+    if (instanceId == null) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Error: Instance ID is required')),
+        );
+      }
+      return;
+    }
+
+    // Check if instance is enabled before allowing toggle
+    final instancesAsync = ref.read(instancesProvider);
+    final instances = instancesAsync.value;
+    if (instances != null) {
+      final instance = instances.firstWhere(
+        (inst) => inst.id == instanceId,
+        orElse: () => throw Exception('Instance not found'),
+      );
+      if (!instance.active) {
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Please enable the instance first'),
+              backgroundColor: Colors.orange,
+            ),
+          );
+        }
+        return;
+      }
+    }
+
     // Default behavior: use repository
     final repository = ref.read(workflowRepositoryProvider);
     try {
-      await repository.toggleWorkflow(workflow.id, value);
+      await repository.toggleWorkflow(workflow.id, value, instanceId: instanceId!);
+      // Invalidate providers to refresh data
+      // The optimistic update should already be visible in the cache
       ref.invalidate(workflowsProvider);
-      ref.invalidate(workflowsWithInstanceProvider);
+      // Refresh workflowsWithInstanceProvider to show the updated data
+      ref.read(workflowsWithInstanceProvider.notifier).refresh();
     } catch (e) {
+      // Ignore cancellation errors - they're expected when invalidating providers
+      if (e is DioException && e.type == DioExceptionType.cancel) {
+        return;
+      }
+      // Also check for cancellation in error message (for wrapped exceptions)
+      if (e.toString().contains('Request cancelled') || 
+          e.toString().contains('request cancelled')) {
+        return;
+      }
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Error: $e')),
@@ -84,6 +129,22 @@ class WorkflowListTile extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    // Check if instance is enabled to determine if switch should be enabled
+    final instancesAsync = ref.watch(instancesProvider);
+    final isInstanceEnabled = instancesAsync.when(
+      data: (instances) {
+        if (instanceId == null) return false;
+        try {
+          final instance = instances.firstWhere((inst) => inst.id == instanceId);
+          return instance.active;
+        } catch (e) {
+          return false;
+        }
+      },
+      loading: () => false,
+      error: (_, __) => false,
+    );
+
     final listTile = ListTile(
       onTap: () => _handleTap(context),
       title: Text(
@@ -154,7 +215,9 @@ class WorkflowListTile extends ConsumerWidget {
       ),
       trailing: Switch(
         value: workflow.active,
-        onChanged: (value) => _handleToggle(context, ref, value),
+        onChanged: isInstanceEnabled
+            ? (value) => _handleToggle(context, ref, value)
+            : null, // Disable switch if instance is not enabled
       ),
     );
 

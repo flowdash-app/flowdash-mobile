@@ -209,9 +209,84 @@ class WorkflowRepositoryImpl implements WorkflowRepository {
 ### Provider Structure
 
 - **State Providers**: For simple state (`StateProvider`)
-- **Future Providers**: For async data (`FutureProvider`)
+- **Future Providers**: For simple async data without refresh logic (`FutureProvider`)
+- **AsyncNotifier Providers**: For async data with explicit refresh control (`AsyncNotifierProvider`) - **PREFERRED for main data providers**
 - **Stream Providers**: For real-time data (`StreamProvider`)
 - **Notifier Providers**: For complex state logic (`NotifierProvider`)
+
+### When to Use AsyncNotifierProvider vs FutureProvider
+
+**Use AsyncNotifierProvider when:**
+- You need explicit control over loading states
+- You need custom refresh methods with cache clearing
+- You want to track loading state during refresh operations
+- The data is central to your app (instances, workflows, etc.)
+
+**Use FutureProvider when:**
+- Simple data fetching without complex refresh logic
+- One-time data loading
+- Data that rarely needs refresh
+
+### AsyncNotifierProvider Pattern
+
+```dart
+// Define the notifier class
+class InstancesNotifier extends AsyncNotifier<List<Instance>> {
+  @override
+  Future<List<Instance>> build() async {
+    final repository = ref.read(instanceRepositoryProvider);
+    final cancelToken = CancelToken();
+
+    ref.onDispose(() {
+      if (!cancelToken.isCancelled) {
+        cancelToken.cancel('Provider disposed');
+      }
+    });
+
+    return repository.getInstances(cancelToken: cancelToken);
+  }
+
+  Future<void> refresh() async {
+    state = const AsyncValue.loading();
+    state = await AsyncValue.guard(() async {
+      final repository = ref.read(instanceRepositoryProvider);
+      await repository.refreshInstances(); // Clear cache
+      final cancelToken = CancelToken();
+      ref.onDispose(() {
+        if (!cancelToken.isCancelled) {
+          cancelToken.cancel('Provider disposed');
+        }
+      });
+      return repository.getInstances(cancelToken: cancelToken);
+    });
+  }
+}
+
+// Create the provider
+final instancesProvider = AsyncNotifierProvider<InstancesNotifier, List<Instance>>(() {
+  return InstancesNotifier();
+});
+```
+
+### Using AsyncNotifierProvider in UI
+
+```dart
+// Watch the provider - returns AsyncValue
+final instancesAsync = ref.watch(instancesProvider);
+
+// Check loading state (useful for refresh buttons)
+final isLoading = instancesAsync.isLoading && !instancesAsync.hasValue;
+
+// Refresh using notifier method
+await ref.read(instancesProvider.notifier).refresh();
+
+// Display data with when()
+instancesAsync.when(
+  data: (instances) => ListView.builder(...),
+  loading: () => ShimmerLoadingList(),
+  error: (error, stack) => ErrorWidget(...),
+)
+```
 
 ### Provider Organization
 
@@ -222,9 +297,13 @@ final authStateProvider = StreamProvider<User?>((ref) {
   return repository.authStateChanges;
 });
 
-final workflowsProvider = FutureProvider<List<Workflow>>((ref) async {
-  final repository = ref.watch(workflowRepositoryProvider);
-  return repository.getWorkflows();
+// Main data providers - use AsyncNotifierProvider
+final instancesProvider = AsyncNotifierProvider<InstancesNotifier, List<Instance>>(() {
+  return InstancesNotifier();
+});
+
+final workflowsWithInstanceProvider = AsyncNotifierProvider<WorkflowsWithInstanceNotifier, List<WorkflowWithInstance>>(() {
+  return WorkflowsWithInstanceNotifier();
 });
 ```
 
@@ -240,14 +319,71 @@ final workflowRepositoryProvider = Provider<WorkflowRepository>((ref) {
 ### State Refresh Patterns
 
 ```dart
-// Refresh provider
+// For AsyncNotifierProvider - use notifier refresh method
+await ref.read(instancesProvider.notifier).refresh();
+
+// For FutureProvider - use invalidate
 ref.invalidate(workflowsProvider);
 
 // Watch for changes
-ref.listen(workflowsProvider, (previous, next) {
+ref.listen(instancesProvider, (previous, next) {
   // Handle state changes
 });
 ```
+
+### Loading State Management
+
+**For Refresh Buttons:**
+```dart
+// Check if provider is loading (during initial load or refresh)
+final isLoading = ref.watch(instancesProvider).isLoading && 
+                  !ref.watch(instancesProvider).hasValue;
+
+IconButton(
+  icon: isLoading 
+    ? const SizedBox(
+        width: 20,
+        height: 20,
+        child: CircularProgressIndicator(strokeWidth: 2),
+      )
+    : const Icon(Icons.refresh),
+  onPressed: isLoading ? null : () {
+    ref.read(instancesProvider.notifier).refresh();
+  },
+);
+```
+
+**For UI-Only Loading (e.g., Toggle Switches):**
+
+Keep it simple - use local state or optimistic updates without complex tracking:
+
+```dart
+// Option 1: Optimistic updates (preferred)
+// Repository handles the async operation and cache updates
+// UI shows the new state immediately
+Switch(
+  value: instance.active,
+  onChanged: (value) async {
+    try {
+      await repository.toggleInstance(instance.id, value);
+      ref.read(instancesProvider.notifier).refresh();
+    } catch (e) {
+      // Show error and revert
+      ref.read(instancesProvider.notifier).refresh();
+    }
+  },
+)
+
+// Option 2: Local state (for explicit loading indication)
+class InstanceSwitch extends StatefulWidget {
+  final Instance instance;
+  final Function(bool) onToggle;
+  
+  // Widget manages its own _isToggling state internally
+}
+```
+
+**Best Practice**: Avoid creating separate providers for every UI loading state. Use AsyncNotifierProvider's built-in loading state for main data operations, and simple local state for UI-specific interactions.
 
 ## Navigation (go_router with go_router_builder)
 

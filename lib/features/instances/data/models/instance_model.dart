@@ -10,7 +10,7 @@ sealed class InstanceModel with _$InstanceModel {
     required String id,
     required String name,
     required String url,
-    @JsonKey(fromJson: _activeFromJson) @Default(false) bool active,
+    @JsonKey(name: 'enabled', fromJson: _activeFromJson) @Default(false) bool active,
     @JsonKey(fromJson: _dateTimeFromJson) DateTime? lastConnectedAt,
     @JsonKey(fromJson: _dateTimeFromJson) DateTime? createdAt,
   }) = _InstanceModel;
@@ -20,12 +20,13 @@ sealed class InstanceModel with _$InstanceModel {
 }
 
 // JSON conversion helpers
+// The json parameter is the value of the 'enabled' field from the backend
 bool _activeFromJson(dynamic json) {
   if (json == null) return false;
   if (json is bool) return json;
-  // Backend returns 'enabled' but we use 'active' internally
-  if (json is Map) {
-    return json['enabled'] as bool? ?? json['active'] as bool? ?? false;
+  // Handle string representations
+  if (json is String) {
+    return json.toLowerCase() == 'true';
   }
   return false;
 }

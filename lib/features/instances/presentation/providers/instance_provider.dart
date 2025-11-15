@@ -26,17 +26,39 @@ final instanceRepositoryProvider = Provider<InstanceRepository>((ref) {
   );
 });
 
-final instancesProvider = FutureProvider<List<Instance>>((ref) async {
-  final repository = ref.watch(instanceRepositoryProvider);
-  final cancelToken = CancelToken();
+class InstancesNotifier extends AsyncNotifier<List<Instance>> {
+  @override
+  Future<List<Instance>> build() async {
+    final repository = ref.read(instanceRepositoryProvider);
+    final cancelToken = CancelToken();
 
-  ref.onDispose(() {
-    if (!cancelToken.isCancelled) {
-      cancelToken.cancel('Provider disposed');
-    }
-  });
+    ref.onDispose(() {
+      if (!cancelToken.isCancelled) {
+        cancelToken.cancel('Provider disposed');
+      }
+    });
 
-  return repository.getInstances(cancelToken: cancelToken);
+    return repository.getInstances(cancelToken: cancelToken);
+  }
+
+  Future<void> refresh() async {
+    state = const AsyncValue.loading();
+    state = await AsyncValue.guard(() async {
+      final repository = ref.read(instanceRepositoryProvider);
+      await repository.refreshInstances();
+      final cancelToken = CancelToken();
+      ref.onDispose(() {
+        if (!cancelToken.isCancelled) {
+          cancelToken.cancel('Provider disposed');
+        }
+      });
+      return repository.getInstances(cancelToken: cancelToken);
+    });
+  }
+}
+
+final instancesProvider = AsyncNotifierProvider<InstancesNotifier, List<Instance>>(() {
+  return InstancesNotifier();
 });
 
 final instanceProvider =

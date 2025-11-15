@@ -106,3 +106,4 @@ coverage/
 .fvm/
 .fvm*
 lib/firebase_options.dart
+GoogleService-Info.plist

@@ -4,6 +4,10 @@ import 'package:flowdash_mobile/core/routing/app_router.dart';
 import 'package:flowdash_mobile/features/auth/presentation/providers/auth_provider.dart';
 import 'package:flowdash_mobile/features/instances/presentation/providers/instance_provider.dart';
 import 'package:flowdash_mobile/features/workflows/presentation/providers/workflow_provider.dart';
+import 'package:flowdash_mobile/shared/widgets/shimmer_list_tile.dart';
+import 'package:flowdash_mobile/shared/widgets/full_page_empty_state.dart';
+import 'package:flowdash_mobile/shared/widgets/full_page_error_state.dart';
+import 'package:flowdash_mobile/shared/widgets/switchable_list_tile.dart';
 
 class InstancesPage extends ConsumerStatefulWidget {
   const InstancesPage({super.key});
@@ -39,15 +43,8 @@ class _InstancesPageState extends ConsumerState<InstancesPage> {
       child: Scaffold(
       body: RefreshIndicator(
         onRefresh: () async {
-          // Clear cache to force server fetch
-          final repository = ref.read(instanceRepositoryProvider);
-          await repository.refreshInstances();
-          
-          // Invalidate provider to trigger refresh from server
-          ref.invalidate(instancesProvider);
-          
-          // Wait for the provider to complete its fetch from server
-          await ref.read(instancesProvider.future);
+          // Use notifier refresh method which clears cache and refetches
+          await ref.read(instancesProvider.notifier).refresh();
         },
         child: CustomScrollView(
           slivers: [
@@ -68,46 +65,16 @@ class _InstancesPageState extends ConsumerState<InstancesPage> {
             instancesAsync.when(
               data: (instances) => instances.isEmpty
                   ? SliverFillRemaining(
-                      child: Center(
-                        child: Padding(
-                          padding: const EdgeInsets.all(32.0),
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            crossAxisAlignment: CrossAxisAlignment.center,
-                            children: [
-                              Icon(
-                                Icons.cloud_off,
-                                size: 64,
-                                color: Colors.grey[400],
-                              ),
-                              const SizedBox(height: 16),
-                              const Text(
-                                'No instances found',
-                                textAlign: TextAlign.center,
-                                style: TextStyle(
-                                  fontSize: 20,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                              const SizedBox(height: 8),
-                              Text(
-                                'Add an n8n instance to get started with workflows.',
-                                textAlign: TextAlign.center,
-                                style: TextStyle(
-                                  fontSize: 14,
-                                  color: Colors.grey[600],
-                                ),
-                              ),
-                              const SizedBox(height: 24),
-                              ElevatedButton.icon(
-                                onPressed: () {
-                                  const AddInstanceRoute().push(context);
-                                },
-                                icon: const Icon(Icons.add_circle_outline),
-                                label: const Text('Add Instance'),
-                              ),
-                            ],
-                          ),
+                      child: FullPageEmptyState(
+                        icon: Icons.cloud_off,
+                        title: 'No instances found',
+                        message: 'Add an n8n instance to get started with workflows.',
+                        actionButton: ElevatedButton.icon(
+                          onPressed: () {
+                            const AddInstanceRoute().push(context);
+                          },
+                          icon: const Icon(Icons.add_circle_outline),
+                          label: const Text('Add Instance'),
                         ),
                       ),
                     )
@@ -115,124 +82,70 @@ class _InstancesPageState extends ConsumerState<InstancesPage> {
                       delegate: SliverChildBuilderDelegate(
                         (context, index) {
                           final instance = instances[index];
-                          return Card(
-                            margin: const EdgeInsets.symmetric(
-                              horizontal: 16,
-                              vertical: 8,
-                            ),
-                            child: ListTile(
-                              title: Text(instance.name),
-                              subtitle: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(instance.url),
-                                  const SizedBox(height: 4),
-                                  Text(
-                                    instance.active ? 'Active' : 'Inactive',
-                                    style: TextStyle(
-                                      color: instance.active
-                                          ? Colors.green
-                                          : Colors.grey,
-                                      fontWeight: FontWeight.bold,
-                                    ),
+                          return SwitchableListTile(
+                            title: instance.name,
+                            subtitle: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  instance.url,
+                                  style: const TextStyle(fontSize: 12),
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  instance.active ? 'Active' : 'Inactive',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: instance.active ? Colors.green : Colors.grey,
+                                    fontWeight: FontWeight.bold,
                                   ),
-                                ],
-                              ),
-                              trailing: Switch(
-                                value: instance.active,
-                                onChanged: (value) async {
-                                  final repository =
-                                      ref.read(instanceRepositoryProvider);
-                                  try {
-                                    // Optimistically update the switch immediately
-                                    // The repository will handle the API call and cache update
-                                    await repository.toggleInstance(
-                                        instance.id, value);
-                                    // Invalidate to force refresh from server (cache was cleared)
-                                    ref.invalidate(instancesProvider);
-                                    // Also refresh workflows since active instance may have changed
-                                    ref.invalidate(workflowsProvider);
-                                  } catch (e) {
-                                    if (context.mounted) {
-                                      ScaffoldMessenger.of(context).showSnackBar(
-                                        SnackBar(content: Text('Error: $e')),
-                                      );
-                                      // On error, refresh to revert optimistic update
-                                      ref.invalidate(instancesProvider);
-                                    }
-                                  }
-                                },
-                              ),
+                                ),
+                              ],
                             ),
+                            switchValue: instance.active,
+                            onSwitchChanged: (value) async {
+                              final repository = ref.read(instanceRepositoryProvider);
+                              try {
+                                await repository.toggleInstance(instance.id, value);
+                                ref.read(instancesProvider.notifier).refresh();
+                                ref.read(workflowsWithInstanceProvider.notifier).refresh();
+                              } catch (e) {
+                                if (context.mounted) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(content: Text('Error: $e')),
+                                  );
+                                  ref.read(instancesProvider.notifier).refresh();
+                                }
+                              }
+                            },
+                            wrapInCard: true,
                           );
                         },
                         childCount: instances.length,
                       ),
                     ),
-              loading: () => const SliverFillRemaining(
-                child: Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    crossAxisAlignment: CrossAxisAlignment.center,
-                    children: [
-                      CircularProgressIndicator(),
-                      SizedBox(height: 16),
-                      Text(
-                        'Loading instances...',
-                        textAlign: TextAlign.center,
-                        style: TextStyle(
-                          fontSize: 14,
-                          color: Colors.grey,
-                        ),
-                      ),
-                    ],
+              loading: () => SliverList(
+                delegate: SliverChildBuilderDelegate(
+                  (context, index) => const ShimmerListTile(
+                    wrapInCard: true,
+                    showTrailing: true,
                   ),
+                  childCount: 5,
                 ),
               ),
               error: (error, stack) {
                 final errorMessage = error.toString().replaceAll('Exception: ', '');
                 return SliverFillRemaining(
-                  child: Center(
-                    child: Padding(
-                      padding: const EdgeInsets.all(32.0),
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        crossAxisAlignment: CrossAxisAlignment.center,
-                        children: [
-                          Icon(
-                            Icons.error_outline,
-                            size: 64,
-                            color: Colors.red[300],
-                          ),
-                          const SizedBox(height: 16),
-                          const Text(
-                            'Failed to load instances',
-                            textAlign: TextAlign.center,
-                            style: TextStyle(
-                              fontSize: 20,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                          const SizedBox(height: 8),
-                          Text(
-                            errorMessage,
-                            textAlign: TextAlign.center,
-                            style: TextStyle(
-                              fontSize: 14,
-                              color: Colors.grey[600],
-                            ),
-                          ),
-                          const SizedBox(height: 24),
-                          ElevatedButton.icon(
-                            onPressed: () {
-                              // Invalidate will immediately show loading state
-                              ref.invalidate(instancesProvider);
-                            },
-                            icon: const Icon(Icons.refresh),
-                            label: const Text('Retry'),
-                          ),
-                        ],
-                      ),
+                  child: FullPageErrorState(
+                    icon: Icons.error_outline,
+                    title: 'Failed to load instances',
+                    message: errorMessage,
+                    actionButton: ElevatedButton.icon(
+                      onPressed: () {
+                        ref.read(instancesProvider.notifier).refresh();
+                      },
+                      icon: const Icon(Icons.refresh),
+                      label: const Text('Retry'),
                     ),
                   ),
                 );

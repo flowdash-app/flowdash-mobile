@@ -1,16 +1,16 @@
 import 'package:dio/dio.dart';
-import 'package:logging/logging.dart';
-import 'package:flowdash_mobile/core/utils/logger.dart';
 import 'package:flowdash_mobile/core/analytics/analytics_service.dart';
 import 'package:flowdash_mobile/core/errors/exceptions.dart';
+import 'package:flowdash_mobile/core/utils/logger.dart';
+import 'package:flowdash_mobile/features/instances/domain/repositories/instance_repository.dart';
+import 'package:flowdash_mobile/features/workflows/data/datasources/workflow_local_datasource.dart';
+import 'package:flowdash_mobile/features/workflows/data/datasources/workflow_remote_datasource.dart';
+import 'package:flowdash_mobile/features/workflows/data/models/workflow_execution_model.dart';
+import 'package:flowdash_mobile/features/workflows/data/models/workflow_model.dart';
 import 'package:flowdash_mobile/features/workflows/domain/entities/workflow.dart';
 import 'package:flowdash_mobile/features/workflows/domain/entities/workflow_execution.dart';
 import 'package:flowdash_mobile/features/workflows/domain/repositories/workflow_repository.dart';
-import 'package:flowdash_mobile/features/workflows/data/datasources/workflow_remote_datasource.dart';
-import 'package:flowdash_mobile/features/workflows/data/datasources/workflow_local_datasource.dart';
-import 'package:flowdash_mobile/features/workflows/data/models/workflow_model.dart';
-import 'package:flowdash_mobile/features/workflows/data/models/workflow_execution_model.dart';
-import 'package:flowdash_mobile/features/instances/domain/repositories/instance_repository.dart';
+import 'package:logging/logging.dart';
 
 class WorkflowRepositoryImpl implements WorkflowRepository {
   final WorkflowRemoteDataSource _remoteDataSource;
@@ -24,10 +24,10 @@ class WorkflowRepositoryImpl implements WorkflowRepository {
     required WorkflowLocalDataSource localDataSource,
     required AnalyticsService analytics,
     required InstanceRepository instanceRepository,
-  })  : _remoteDataSource = remoteDataSource,
-        _localDataSource = localDataSource,
-        _analytics = analytics,
-        _instanceRepository = instanceRepository;
+  }) : _remoteDataSource = remoteDataSource,
+       _localDataSource = localDataSource,
+       _analytics = analytics,
+       _instanceRepository = instanceRepository;
 
   @override
   Future<List<Workflow>> getWorkflows({CancelToken? cancelToken}) async {
@@ -42,12 +42,14 @@ class WorkflowRepositoryImpl implements WorkflowRepository {
       if (cached != null && cached.isNotEmpty) {
         _logger.info('getWorkflows: Success (cached) - ${cached.length} workflows');
         await _analytics.logSuccess(
-            action: 'get_workflows', parameters: {'source': 'cache', 'count': cached.length});
+          action: 'get_workflows',
+          parameters: {'source': 'cache', 'count': cached.length},
+        );
         trace?.stop();
         // Convert WorkflowModel list to Workflow list
         return cached.map((w) => w.toEntity()).toList();
       }
-      
+
       // If cache is empty, clear it and fetch from remote
       if (cached != null && cached.isEmpty) {
         _logger.info('getWorkflows: Cache is empty, clearing and fetching from remote');
@@ -55,16 +57,19 @@ class WorkflowRepositoryImpl implements WorkflowRepository {
       }
 
       // Get all instances to fetch workflows from all of them
-      final instances = await _instanceRepository.getInstances(
-        cancelToken: cancelToken,
-      );
+      final instances = await _instanceRepository.getInstances(cancelToken: cancelToken);
       if (instances.isEmpty) {
         throw Exception('No instances found. Please add an instance first.');
       }
 
-      // Fetch workflows from all instances and track which instance they belong to
+      // Fetch workflows from all enabled instances and track which instance they belong to
       final allWorkflows = <({WorkflowModel workflow, String instanceId, String instanceName})>[];
       for (final instance in instances) {
+        // Skip disabled instances - don't fetch workflows for them
+        if (!instance.active) {
+          continue;
+        }
+
         try {
           final workflows = await _remoteDataSource.getWorkflows(
             instanceId: instance.id,
@@ -90,12 +95,12 @@ class WorkflowRepositoryImpl implements WorkflowRepository {
         // First by instance ID (alphabetically by instance name)
         final instanceCompare = a.instanceName.compareTo(b.instanceName);
         if (instanceCompare != 0) return instanceCompare;
-        
+
         // Then by active status (enabled/active first)
         if (a.workflow.active != b.workflow.active) {
           return b.workflow.active ? 1 : -1; // Active (enabled) first
         }
-        
+
         // Finally alphabetically by workflow name
         return a.workflow.name.compareTo(b.workflow.name);
       });
@@ -105,10 +110,15 @@ class WorkflowRepositoryImpl implements WorkflowRepository {
       final workflowsList = allWorkflows.map((w) => w.workflow).toList();
       await _localDataSource.cacheWorkflows(workflowsList);
       _logger.info(
-          'getWorkflows: Success (remote) - ${allWorkflows.length} workflows from ${instances.length} instances');
+        'getWorkflows: Success (remote) - ${allWorkflows.length} workflows from ${instances.length} instances',
+      );
       await _analytics.logSuccess(
         action: 'get_workflows',
-        parameters: {'source': 'remote', 'count': allWorkflows.length, 'instances': instances.length},
+        parameters: {
+          'source': 'remote',
+          'count': allWorkflows.length,
+          'instances': instances.length,
+        },
       );
       trace?.stop();
       // Convert WorkflowModel list to Workflow list for return
@@ -116,10 +126,11 @@ class WorkflowRepositoryImpl implements WorkflowRepository {
     } catch (e, stackTrace) {
       // Don't send business logic exceptions to Crashlytics
       final errorString = e.toString();
-      final isBusinessLogicException = errorString.contains('No active instance found') ||
+      final isBusinessLogicException =
+          errorString.contains('No active instance found') ||
           errorString.contains('No instances found') ||
           errorString.contains('Please activate');
-      
+
       await _analytics.logFailure(
         action: 'get_workflows',
         error: errorString,
@@ -142,9 +153,34 @@ class WorkflowRepositoryImpl implements WorkflowRepository {
     final trace = _analytics.startTrace('get_workflows_paginated');
     trace?.start();
 
-    _logger.info('getWorkflowsPaginated: Entry - instanceId: $instanceId, limit: $limit, cursor: $cursor');
+    _logger.info(
+      'getWorkflowsPaginated: Entry - instanceId: $instanceId, limit: $limit, cursor: $cursor',
+    );
 
     try {
+      // If no cursor (first page), try cache first for instant UI updates
+      if (cursor == null) {
+        final cached = await _localDataSource.getWorkflows();
+        if (cached != null && cached.isNotEmpty) {
+          // Filter by instance if we can determine which workflows belong to this instance
+          // For now, return all cached workflows (they'll be filtered by the provider)
+          // This allows optimistic updates to be visible immediately
+          final workflows = cached.map((w) => w.toEntity()).toList();
+          _logger.info('getWorkflowsPaginated: Success (cached) - ${workflows.length} workflows');
+          await _analytics.logSuccess(
+            action: 'get_workflows_paginated',
+            parameters: {
+              'instance_id': instanceId,
+              'count': workflows.length,
+              'has_next': false,
+              'source': 'cache',
+            },
+          );
+          trace?.stop();
+          return (data: workflows, nextCursor: null);
+        }
+      }
+
       final result = await _remoteDataSource.getWorkflowsPaginated(
         instanceId: instanceId,
         limit: limit,
@@ -156,7 +192,9 @@ class WorkflowRepositoryImpl implements WorkflowRepository {
       // Convert WorkflowModel list to Workflow list
       final workflows = result.data.map((w) => w.toEntity()).toList();
 
-      _logger.info('getWorkflowsPaginated: Success - ${workflows.length} workflows, hasNext: ${result.nextCursor != null}');
+      _logger.info(
+        'getWorkflowsPaginated: Success - ${workflows.length} workflows, hasNext: ${result.nextCursor != null}',
+      );
       await _analytics.logSuccess(
         action: 'get_workflows_paginated',
         parameters: {
@@ -168,6 +206,14 @@ class WorkflowRepositoryImpl implements WorkflowRepository {
       trace?.stop();
       return (data: workflows, nextCursor: result.nextCursor);
     } catch (e, stackTrace) {
+      // Don't log cancellation errors as failures - they're expected when provider is invalidated
+      if (e is DioException && e.type == DioExceptionType.cancel) {
+        trace?.stop();
+        _logger.info(
+          'getWorkflowsPaginated: Cancelled - instanceId: $instanceId (expected when provider invalidated)',
+        );
+        rethrow;
+      }
       await _analytics.logFailure(
         action: 'get_workflows_paginated',
         error: e.toString(),
@@ -180,8 +226,7 @@ class WorkflowRepositoryImpl implements WorkflowRepository {
   }
 
   @override
-  Future<Workflow> getWorkflowById(String id,
-      {CancelToken? cancelToken}) async {
+  Future<Workflow> getWorkflowById(String id, {CancelToken? cancelToken}) async {
     final trace = _analytics.startTrace('get_workflow_by_id');
     trace?.start();
 
@@ -241,12 +286,20 @@ class WorkflowRepositoryImpl implements WorkflowRepository {
   }
 
   @override
-  Future<void> toggleWorkflow(String id, bool enabled,
-      {CancelToken? cancelToken}) async {
+  Future<void> toggleWorkflow(
+    String id,
+    bool enabled, {
+    required String instanceId,
+    CancelToken? cancelToken,
+  }) async {
     final trace = _analytics.startTrace('toggle_workflow');
     trace?.start();
 
-    _logger.info('toggleWorkflow: Entry - $id, enabled: $enabled');
+    _logger.info('toggleWorkflow: Entry - $id, enabled: $enabled, instanceId: $instanceId');
+
+    // Create a separate CancelToken for the toggle request to avoid cancellation
+    // when providers are invalidated
+    final toggleCancelToken = cancelToken ?? CancelToken();
 
     // Optimistically update cache for instant UI feedback
     final cacheUpdated = await _localDataSource.updateWorkflow(id, enabled);
@@ -258,7 +311,8 @@ class WorkflowRepositoryImpl implements WorkflowRepository {
       await _remoteDataSource.toggleWorkflow(
         id,
         enabled,
-        cancelToken: cancelToken,
+        instanceId: instanceId,
+        cancelToken: toggleCancelToken,
       );
 
       // Cache was already updated optimistically, so we're good
@@ -312,7 +366,9 @@ class WorkflowRepositoryImpl implements WorkflowRepository {
     final trace = _analytics.startTrace('get_executions');
     trace?.start();
 
-    _logger.info('getExecutions: Entry - instanceId: $instanceId, workflowId: $workflowId, limit: $limit, cursor: $cursor');
+    _logger.info(
+      'getExecutions: Entry - instanceId: $instanceId, workflowId: $workflowId, limit: $limit, cursor: $cursor',
+    );
 
     try {
       final result = await _remoteDataSource.getExecutions(
@@ -327,7 +383,9 @@ class WorkflowRepositoryImpl implements WorkflowRepository {
       // Convert WorkflowExecutionModel list to WorkflowExecution list
       final executions = result.data.map((e) => e.toEntity()).toList();
 
-      _logger.info('getExecutions: Success - ${executions.length} executions, hasNext: ${result.nextCursor != null}');
+      _logger.info(
+        'getExecutions: Success - ${executions.length} executions, hasNext: ${result.nextCursor != null}',
+      );
       await _analytics.logSuccess(
         action: 'get_executions',
         parameters: {
@@ -343,10 +401,7 @@ class WorkflowRepositoryImpl implements WorkflowRepository {
       await _analytics.logFailure(
         action: 'get_executions',
         error: e.toString(),
-        parameters: {
-          'instance_id': instanceId,
-          if (workflowId != null) 'workflow_id': workflowId,
-        },
+        parameters: {'instance_id': instanceId, if (workflowId != null) 'workflow_id': workflowId},
       );
       trace?.stop();
       _logger.severe('getExecutions: Failure', e, stackTrace);
@@ -364,7 +419,9 @@ class WorkflowRepositoryImpl implements WorkflowRepository {
     final trace = _analytics.startTrace('get_execution_by_id');
     trace?.start();
 
-    _logger.info('getExecutionById: Entry - executionId: $executionId, instanceId: $instanceId, includeData: $includeData');
+    _logger.info(
+      'getExecutionById: Entry - executionId: $executionId, instanceId: $instanceId, includeData: $includeData',
+    );
 
     try {
       final executionModel = await _remoteDataSource.getExecutionById(
@@ -378,10 +435,7 @@ class WorkflowRepositoryImpl implements WorkflowRepository {
       _logger.info('getExecutionById: Success - $executionId');
       await _analytics.logSuccess(
         action: 'get_execution_by_id',
-        parameters: {
-          'execution_id': executionId,
-          'instance_id': instanceId,
-        },
+        parameters: {'execution_id': executionId, 'instance_id': instanceId},
       );
       trace?.stop();
       return execution;
@@ -389,10 +443,7 @@ class WorkflowRepositoryImpl implements WorkflowRepository {
       await _analytics.logFailure(
         action: 'get_execution_by_id',
         error: e.toString(),
-        parameters: {
-          'execution_id': executionId,
-          'instance_id': instanceId,
-        },
+        parameters: {'execution_id': executionId, 'instance_id': instanceId},
       );
       trace?.stop();
       _logger.severe('getExecutionById: Failure', e, stackTrace);

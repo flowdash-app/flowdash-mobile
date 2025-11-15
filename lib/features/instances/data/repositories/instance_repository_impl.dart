@@ -1,13 +1,13 @@
 import 'package:dio/dio.dart';
-import 'package:logging/logging.dart';
-import 'package:flowdash_mobile/core/utils/logger.dart';
 import 'package:flowdash_mobile/core/analytics/analytics_service.dart';
 import 'package:flowdash_mobile/core/storage/local_storage.dart';
+import 'package:flowdash_mobile/core/utils/logger.dart';
+import 'package:flowdash_mobile/features/instances/data/datasources/instance_local_datasource.dart';
+import 'package:flowdash_mobile/features/instances/data/datasources/instance_remote_datasource.dart';
+import 'package:flowdash_mobile/features/instances/data/models/instance_model.dart';
 import 'package:flowdash_mobile/features/instances/domain/entities/instance.dart';
 import 'package:flowdash_mobile/features/instances/domain/repositories/instance_repository.dart';
-import 'package:flowdash_mobile/features/instances/data/datasources/instance_remote_datasource.dart';
-import 'package:flowdash_mobile/features/instances/data/datasources/instance_local_datasource.dart';
-import 'package:flowdash_mobile/features/instances/data/models/instance_model.dart';
+import 'package:logging/logging.dart';
 
 class InstanceRepositoryImpl implements InstanceRepository {
   final InstanceRemoteDataSource _remoteDataSource;
@@ -21,10 +21,10 @@ class InstanceRepositoryImpl implements InstanceRepository {
     required InstanceLocalDataSource localDataSource,
     required AnalyticsService analytics,
     required LocalStorage localStorage,
-  })  : _remoteDataSource = remoteDataSource,
-        _localDataSource = localDataSource,
-        _analytics = analytics,
-        _localStorage = localStorage;
+  }) : _remoteDataSource = remoteDataSource,
+       _localDataSource = localDataSource,
+       _analytics = analytics,
+       _localStorage = localStorage;
 
   @override
   Future<List<Instance>> getInstances({CancelToken? cancelToken}) async {
@@ -40,21 +40,18 @@ class InstanceRepositoryImpl implements InstanceRepository {
       // Empty cache might mean no instances were set up yet
       if (cached != null && cached.isNotEmpty) {
         _logger.info('getInstances: Success (cached)');
-        await _analytics.logSuccess(
-            action: 'get_instances', parameters: {'source': 'cache'});
+        await _analytics.logSuccess(action: 'get_instances', parameters: {'source': 'cache'});
         trace?.stop();
         return cached.map((m) => m.toEntity()).toList();
       }
 
-      // Fetch from remote
-      final instanceModels = await _remoteDataSource.getInstances(
-        cancelToken: cancelToken,
-      );
+      // Fetch from remote - if this times out, the error will be thrown
+      // and FutureProvider will transition to error state
+      final instanceModels = await _remoteDataSource.getInstances(cancelToken: cancelToken);
 
       await _localDataSource.cacheInstances(instanceModels);
       final instances = instanceModels.map((m) => m.toEntity()).toList();
-      _logger.info(
-          'getInstances: Success (remote) - ${instances.length} instances');
+      _logger.info('getInstances: Success (remote) - ${instances.length} instances');
       await _analytics.logSuccess(
         action: 'get_instances',
         parameters: {'source': 'remote', 'count': instances.length},
@@ -62,45 +59,52 @@ class InstanceRepositoryImpl implements InstanceRepository {
       trace?.stop();
       return instances;
     } catch (e, stackTrace) {
-      await _analytics.logFailure(
-        action: 'get_instances',
-        error: e.toString(),
-      );
-      trace?.stop();
+      // Log error first (don't await - fire and forget to avoid blocking error propagation)
       _logger.severe('getInstances: Failure', e, stackTrace);
+      trace?.stop();
+
+      // Log analytics failure (fire and forget - don't block on this)
+      _analytics.logFailure(action: 'get_instances', error: e.toString()).catchError((err) {
+        // If analytics logging fails, don't let it block error propagation
+        _logger.warning('getInstances: Analytics logging failed', err);
+      });
+
+      // Rethrow immediately to ensure FutureProvider transitions to error state
+      // This is critical - the error must propagate for the UI to show error state
       rethrow;
     }
   }
 
   @override
-  Future<Instance> getInstanceById(String id,
-      {CancelToken? cancelToken}) async {
+  Future<Instance> getInstanceById(String id, {CancelToken? cancelToken}) async {
     final trace = _analytics.startTrace('get_instance_by_id');
     trace?.start();
 
     _logger.info('getInstanceById: Entry - $id');
 
     try {
-      final instanceModel = await _remoteDataSource.getInstanceById(
-        id,
-        cancelToken: cancelToken,
-      );
+      final instanceModel = await _remoteDataSource.getInstanceById(id, cancelToken: cancelToken);
 
       _logger.info('getInstanceById: Success - $id');
-      await _analytics.logSuccess(
-        action: 'get_instance_by_id',
-        parameters: {'instance_id': id},
-      );
+      await _analytics.logSuccess(action: 'get_instance_by_id', parameters: {'instance_id': id});
       trace?.stop();
       return instanceModel.toEntity();
     } catch (e, stackTrace) {
-      await _analytics.logFailure(
-        action: 'get_instance_by_id',
-        error: e.toString(),
-        parameters: {'instance_id': id},
-      );
-      trace?.stop();
       _logger.severe('getInstanceById: Failure', e, stackTrace);
+      trace?.stop();
+
+      // Log analytics failure (fire and forget - don't block on this)
+      _analytics
+          .logFailure(
+            action: 'get_instance_by_id',
+            error: e.toString(),
+            parameters: {'instance_id': id},
+          )
+          .catchError((err) {
+            _logger.warning('getInstanceById: Analytics logging failed', err);
+          });
+
+      // Rethrow immediately to ensure error propagates
       rethrow;
     }
   }
@@ -138,28 +142,32 @@ class InstanceRepositoryImpl implements InstanceRepository {
       _logger.info('createInstance: Success - ${instance.id}');
       await _analytics.logSuccess(
         action: 'create_instance',
-        parameters: {
-          'instance_id': instance.id,
-          'name': name,
-        },
+        parameters: {'instance_id': instance.id, 'name': name},
       );
       trace?.stop();
       return instance;
     } catch (e, stackTrace) {
-      await _analytics.logFailure(
-        action: 'create_instance',
-        error: e.toString(),
-        parameters: {'name': name, 'url': url},
-      );
-      trace?.stop();
       _logger.severe('createInstance: Failure', e, stackTrace);
+      trace?.stop();
+
+      // Log analytics failure (fire and forget - don't block on this)
+      _analytics
+          .logFailure(
+            action: 'create_instance',
+            error: e.toString(),
+            parameters: {'name': name, 'url': url},
+          )
+          .catchError((err) {
+            _logger.warning('createInstance: Analytics logging failed', err);
+          });
+
+      // Rethrow immediately to ensure error propagates
       rethrow;
     }
   }
 
   @override
-  Future<void> toggleInstance(String id, bool enabled,
-      {CancelToken? cancelToken}) async {
+  Future<void> toggleInstance(String id, bool enabled, {CancelToken? cancelToken}) async {
     final trace = _analytics.startTrace('toggle_instance');
     trace?.start();
 
@@ -178,11 +186,7 @@ class InstanceRepositoryImpl implements InstanceRepository {
       _logger.info('toggleInstance: Optimistic update applied - $id');
 
       // Make API call
-      await _remoteDataSource.toggleInstance(
-        id,
-        enabled,
-        cancelToken: cancelToken,
-      );
+      await _remoteDataSource.toggleInstance(id, enabled, cancelToken: cancelToken);
 
       // Set flag if instance is being enabled (user has set an instance)
       if (enabled) {
@@ -208,13 +212,21 @@ class InstanceRepositoryImpl implements InstanceRepository {
     } catch (e, stackTrace) {
       // On error, revert optimistic update by clearing cache
       await _localDataSource.clearCache();
-      await _analytics.logFailure(
-        action: 'toggle_instance',
-        error: e.toString(),
-        parameters: {'instance_id': id, 'enabled': enabled},
-      );
-      trace?.stop();
       _logger.severe('toggleInstance: Failure', e, stackTrace);
+      trace?.stop();
+
+      // Log analytics failure (fire and forget - don't block on this)
+      _analytics
+          .logFailure(
+            action: 'toggle_instance',
+            error: e.toString(),
+            parameters: {'instance_id': id, 'enabled': enabled},
+          )
+          .catchError((err) {
+            _logger.warning('toggleInstance: Analytics logging failed', err);
+          });
+
+      // Rethrow immediately to ensure error propagates
       rethrow;
     }
   }

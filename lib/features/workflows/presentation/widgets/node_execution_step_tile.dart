@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'dart:convert';
 import 'package:flowdash_mobile/features/workflows/data/models/execution_data_models.dart';
+import 'package:flowdash_mobile/shared/widgets/info_row.dart';
 
 class NodeExecutionStepTile extends StatelessWidget {
   final String nodeName;
@@ -63,10 +64,10 @@ class NodeExecutionStepTile extends StatelessWidget {
               children: [
                 // Node type if available
                 if (nodeData.type != null)
-                  _buildInfoRow(
-                    context,
-                    'Type',
-                    nodeData.type!,
+                  InfoRow(
+                    label: 'Type',
+                    value: nodeData.type!,
+                    labelWidth: 80,
                   ),
                 
                 // Error message if available
@@ -174,36 +175,6 @@ class NodeExecutionStepTile extends StatelessWidget {
                     ),
                   ),
               ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildInfoRow(BuildContext context, String label, String value) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 4.0),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          SizedBox(
-            width: 80,
-            child: Text(
-              '$label:',
-              style: TextStyle(
-                fontSize: 12,
-                color: Colors.grey[600],
-                fontWeight: FontWeight.w500,
-              ),
-            ),
-          ),
-          Expanded(
-            child: Text(
-              value,
-              style: const TextStyle(
-                fontSize: 12,
-              ),
             ),
           ),
         ],

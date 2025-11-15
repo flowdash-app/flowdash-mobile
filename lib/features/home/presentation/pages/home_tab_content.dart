@@ -6,8 +6,10 @@ import 'package:flowdash_mobile/features/workflows/presentation/providers/workfl
 import 'package:flowdash_mobile/features/workflows/presentation/widgets/workflow_list_tile.dart';
 import 'package:flowdash_mobile/features/instances/presentation/providers/instance_provider.dart';
 import 'package:flowdash_mobile/shared/widgets/empty_state_card.dart';
-import 'package:flowdash_mobile/shared/widgets/loading_state_card.dart';
 import 'package:flowdash_mobile/shared/widgets/error_state_card.dart';
+import 'package:flowdash_mobile/shared/widgets/shimmer_list_tile.dart';
+import 'package:flowdash_mobile/shared/widgets/section_header.dart';
+import 'package:flowdash_mobile/shared/widgets/switchable_list_tile.dart';
 
 class HomeTabContent extends ConsumerStatefulWidget {
   const HomeTabContent({super.key});
@@ -38,20 +40,10 @@ class _HomeTabContentState extends ConsumerState<HomeTabContent> {
     return Scaffold(
       body: RefreshIndicator(
         onRefresh: () async {
-          // Clear cache to force server fetch
-          final workflowRepository = ref.read(workflowRepositoryProvider);
-          final instanceRepository = ref.read(instanceRepositoryProvider);
-          await workflowRepository.refreshWorkflows();
-          await instanceRepository.refreshInstances();
-          
-          // Invalidate providers to trigger refresh from server
-          ref.invalidate(workflowsWithInstanceProvider);
-          ref.invalidate(instancesProvider);
-          
-          // Wait for both providers to complete their fetch from server
+          // Use notifier refresh methods which clear cache and refetch
           await Future.wait([
-            ref.read(workflowsWithInstanceProvider.future),
-            ref.read(instancesProvider.future),
+            ref.read(workflowsWithInstanceProvider.notifier).refresh(),
+            ref.read(instancesProvider.notifier).refresh(),
           ]);
         },
         child: CustomScrollView(
@@ -61,11 +53,26 @@ class _HomeTabContentState extends ConsumerState<HomeTabContent> {
               floating: true,
               snap: true,
               actions: [
-                IconButton(
-                  icon: const Icon(Icons.refresh),
-                  onPressed: () {
-                    ref.invalidate(workflowsWithInstanceProvider);
-                    ref.invalidate(instancesProvider);
+                // Show loading indicator when either provider is loading
+                Builder(
+                  builder: (context) {
+                    final workflowsLoading = workflowsAsync.isLoading && !workflowsAsync.hasValue;
+                    final instancesLoading = instancesAsync.isLoading && !instancesAsync.hasValue;
+                    final isLoading = workflowsLoading || instancesLoading;
+                    
+                    return IconButton(
+                      icon: isLoading 
+                        ? const SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Icon(Icons.refresh),
+                      onPressed: isLoading ? null : () {
+                        ref.read(workflowsWithInstanceProvider.notifier).refresh();
+                        ref.read(instancesProvider.notifier).refresh();
+                      },
+                    );
                   },
                 ),
               ],
@@ -91,46 +98,20 @@ class _HomeTabContentState extends ConsumerState<HomeTabContent> {
                   ),
 
                 // Workflows section
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        const Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'Workflows',
-                              style: TextStyle(
-                                fontSize: 20,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                            SizedBox(height: 4),
-                            Text(
-                              'Automated workflows from your n8n instance',
-                              style: TextStyle(
-                                fontSize: 12,
-                                color: Colors.grey,
-                              ),
-                            ),
-                          ],
-                        ),
-                        TextButton(
-                          onPressed: () {
-                            final analytics = ref.read(analyticsServiceProvider);
-                            analytics.logEvent(
-                              name: 'view_all_clicked',
-                              parameters: {'section': 'workflows'},
-                            );
-                            const HomeWorkflowsRoute().go(context);
-                          },
-                          child: const Text('View All'),
-                        ),
-                      ],
-                    ),
-                  ],
+                SectionHeader(
+                  title: 'Workflows',
+                  subtitle: 'Automated workflows from your n8n instance',
+                  actionButton: TextButton(
+                    onPressed: () {
+                      final analytics = ref.read(analyticsServiceProvider);
+                      analytics.logEvent(
+                        name: 'view_all_clicked',
+                        parameters: {'section': 'workflows'},
+                      );
+                      const HomeWorkflowsRoute().go(context);
+                    },
+                    child: const Text('View All'),
+                  ),
                 ),
                 const SizedBox(height: 8),
                 workflowsAsync.when(
@@ -171,8 +152,17 @@ class _HomeTabContentState extends ConsumerState<HomeTabContent> {
                             ],
                           ),
                         ),
-                  loading: () => LoadingStateCard(
-                    message: 'Loading workflows...',
+                  loading: () => Card(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: List.generate(
+                        3,
+                        (index) => const ShimmerListTile(
+                          wrapInCard: false,
+                          showTrailing: true,
+                        ),
+                      ),
+                    ),
                   ),
                   error: (error, stack) {
                     final errorMessage = error.toString().replaceAll('Exception: ', '');
@@ -205,28 +195,19 @@ class _HomeTabContentState extends ConsumerState<HomeTabContent> {
                 const SizedBox(height: 24),
 
                 // Instances section
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    const Text(
-                      'Instances',
-                      style: TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    TextButton(
-                      onPressed: () {
-                        final analytics = ref.read(analyticsServiceProvider);
-                        analytics.logEvent(
-                          name: 'view_all_clicked',
-                          parameters: {'section': 'instances'},
-                        );
-                        const HomeInstancesRoute().go(context);
-                      },
-                      child: const Text('View All'),
-                    ),
-                  ],
+                SectionHeader(
+                  title: 'Instances',
+                  actionButton: TextButton(
+                    onPressed: () {
+                      final analytics = ref.read(analyticsServiceProvider);
+                      analytics.logEvent(
+                        name: 'view_all_clicked',
+                        parameters: {'section': 'instances'},
+                      );
+                      const HomeInstancesRoute().go(context);
+                    },
+                    child: const Text('View All'),
+                  ),
                 ),
                 const SizedBox(height: 8),
                 instancesAsync.when(
@@ -247,9 +228,9 @@ class _HomeTabContentState extends ConsumerState<HomeTabContent> {
                           child: Column(
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              ...instances.take(3).map((instance) {
-                                return ListTile(
-                                  title: Text(instance.name),
+                              ...instances.take(5).map((instance) {
+                                return SwitchableListTile(
+                                  title: instance.name,
                                   subtitle: Column(
                                     crossAxisAlignment: CrossAxisAlignment.start,
                                     children: [
@@ -262,45 +243,35 @@ class _HomeTabContentState extends ConsumerState<HomeTabContent> {
                                         instance.active ? 'Active' : 'Inactive',
                                         style: TextStyle(
                                           fontSize: 12,
-                                          color: instance.active
-                                              ? Colors.green
-                                              : Colors.grey,
+                                          color: instance.active ? Colors.green : Colors.grey,
                                           fontWeight: FontWeight.bold,
                                         ),
                                       ),
                                     ],
                                   ),
-                                  trailing: Switch(
-                                    value: instance.active,
-                                    onChanged: (value) async {
-                                      final repository = ref
-                                          .read(instanceRepositoryProvider);
-                                      try {
-                                        await repository.toggleInstance(
-                                            instance.id, value);
-                                        // Invalidate to force refresh from server
-                                        ref.invalidate(instancesProvider);
-                                        // Also refresh workflows since active instance changed
-                                        ref.invalidate(workflowsWithInstanceProvider);
-                                      } catch (e) {
-                                        if (context.mounted) {
-                                          ScaffoldMessenger.of(context)
-                                              .showSnackBar(
-                                            SnackBar(
-                                                content: Text('Error: $e')),
-                                          );
-                                          // On error, refresh to revert optimistic update
-                                          ref.invalidate(instancesProvider);
-                                        }
+                                  switchValue: instance.active,
+                                  onSwitchChanged: (value) async {
+                                    final repository = ref.read(instanceRepositoryProvider);
+                                    try {
+                                      await repository.toggleInstance(instance.id, value);
+                                      ref.read(instancesProvider.notifier).refresh();
+                                      ref.read(workflowsWithInstanceProvider.notifier).refresh();
+                                    } catch (e) {
+                                      if (context.mounted) {
+                                        ScaffoldMessenger.of(context).showSnackBar(
+                                          SnackBar(content: Text('Error: $e')),
+                                        );
+                                        ref.read(instancesProvider.notifier).refresh();
                                       }
-                                    },
-                                  ),
+                                    }
+                                  },
+                                  wrapInCard: false,
                                 );
                               }),
-                              if (instances.length > 3)
+                              if (instances.length > 5)
                                 ListTile(
                                   title: Text(
-                                    '${instances.length - 3} more instance${instances.length - 3 > 1 ? 's' : ''}',
+                                    '${instances.length - 5} more instance${instances.length - 5 > 1 ? 's' : ''}',
                                     style: TextStyle(
                                       color: Theme.of(context).colorScheme.primary,
                                       fontWeight: FontWeight.w500,
@@ -314,8 +285,17 @@ class _HomeTabContentState extends ConsumerState<HomeTabContent> {
                             ],
                           ),
                         ),
-                  loading: () => LoadingStateCard(
-                    message: 'Loading instances...',
+                  loading: () => Card(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: List.generate(
+                        3,
+                        (index) => const ShimmerListTile(
+                          wrapInCard: false,
+                          showTrailing: true,
+                        ),
+                      ),
+                    ),
                   ),
                   error: (error, stack) {
                     final errorMessage = error.toString().replaceAll('Exception: ', '');
@@ -325,7 +305,7 @@ class _HomeTabContentState extends ConsumerState<HomeTabContent> {
                       title: 'Failed to load instances',
                       message: errorMessage,
                       actionButton: OutlinedButton.icon(
-                        onPressed: () => ref.invalidate(instancesProvider),
+                        onPressed: () => ref.read(instancesProvider.notifier).refresh(),
                         icon: const Icon(Icons.refresh, size: 18),
                         label: const Text('Retry'),
                       ),

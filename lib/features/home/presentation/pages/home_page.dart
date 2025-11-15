@@ -135,23 +135,7 @@ class _HomePageState extends ConsumerState<HomePage> {
                                     ),
                                     trailing: Switch(
                                       value: workflow.active,
-                                      onChanged: (value) async {
-                                        final repository = ref
-                                            .read(workflowRepositoryProvider);
-                                        try {
-                                          await repository.toggleWorkflow(
-                                              workflow.id, value);
-                                          ref.invalidate(workflowsProvider);
-                                        } catch (e) {
-                                          if (context.mounted) {
-                                            ScaffoldMessenger.of(context)
-                                                .showSnackBar(
-                                              SnackBar(
-                                                  content: Text('Error: $e')),
-                                            );
-                                          }
-                                        }
-                                      },
+                                      onChanged: null, // Disabled - instance ID required for toggle
                                     ),
                                   ),
                                 ),
@@ -219,7 +203,7 @@ class _HomePageState extends ConsumerState<HomePage> {
                                         try {
                                           await repository.toggleInstance(
                                               instance.id, value);
-                                          ref.invalidate(instancesProvider);
+                                          ref.read(instancesProvider.notifier).refresh();
                                         } catch (e) {
                                           if (context.mounted) {
                                             ScaffoldMessenger.of(context)

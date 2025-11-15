@@ -1,9 +1,9 @@
 import 'package:dio/dio.dart';
-import 'package:logging/logging.dart';
-import 'package:flowdash_mobile/core/utils/logger.dart';
 import 'package:flowdash_mobile/core/network/api_client_provider.dart';
+import 'package:flowdash_mobile/core/utils/logger.dart';
 import 'package:flowdash_mobile/features/instances/data/models/instance_model.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:logging/logging.dart';
 
 class InstanceRemoteDataSource {
   final Dio _dio;
@@ -15,11 +15,8 @@ class InstanceRemoteDataSource {
     _logger.info('getInstances: Entry');
 
     try {
-      final response = await _dio.get(
-        '/instances',
-        cancelToken: cancelToken,
-      );
-      
+      final response = await _dio.get('/instances', cancelToken: cancelToken);
+
       // Handle different response structures
       List<dynamic> data;
       if (response.data is List) {
@@ -43,7 +40,7 @@ class InstanceRemoteDataSource {
           'Unexpected response format: expected List or Map, got ${response.data.runtimeType}',
         );
       }
-      
+
       final instances = data
           .map((json) => InstanceModel.fromJson(json as Map<String, dynamic>))
           .toList();
@@ -56,19 +53,12 @@ class InstanceRemoteDataSource {
     }
   }
 
-  Future<InstanceModel> getInstanceById(
-    String id, {
-    CancelToken? cancelToken,
-  }) async {
+  Future<InstanceModel> getInstanceById(String id, {CancelToken? cancelToken}) async {
     _logger.info('getInstanceById: Entry - $id');
 
     try {
-      final response = await _dio.get(
-        '/instances/$id',
-        cancelToken: cancelToken,
-      );
-      final instance =
-          InstanceModel.fromJson(response.data as Map<String, dynamic>);
+      final response = await _dio.get('/instances/$id', cancelToken: cancelToken);
+      final instance = InstanceModel.fromJson(response.data as Map<String, dynamic>);
 
       _logger.info('getInstanceById: Success - $id');
       return instance;
@@ -87,20 +77,12 @@ class InstanceRemoteDataSource {
     _logger.info('createInstance: Entry - name: $name, url: $url');
 
     try {
-      final data = <String, dynamic>{
-        'name': name,
-        'url': url,
-        'active': true, // New instances should be active by default
-      };
+      final data = <String, dynamic>{'name': name, 'url': url, 'enabled': true};
       if (apiKey != null && apiKey.isNotEmpty) {
         data['api_key'] = apiKey;
       }
 
-      final response = await _dio.post(
-        '/instances',
-        data: data,
-        cancelToken: cancelToken,
-      );
+      final response = await _dio.post('/instances', data: data, cancelToken: cancelToken);
 
       // Handle different response structures
       Map<String, dynamic> instanceData;
@@ -128,20 +110,12 @@ class InstanceRemoteDataSource {
     }
   }
 
-  Future<void> toggleInstance(
-    String id,
-    bool enabled, {
-    CancelToken? cancelToken,
-  }) async {
+  Future<void> toggleInstance(String id, bool enabled, {CancelToken? cancelToken}) async {
     _logger.info('toggleInstance: Entry - $id, enabled: $enabled');
 
     try {
       // Backend expects PUT with 'enabled' field (not 'active')
-      await _dio.put(
-        '/instances/$id',
-        data: {'enabled': enabled},
-        cancelToken: cancelToken,
-      );
+      await _dio.put('/instances/$id', data: {'enabled': enabled}, cancelToken: cancelToken);
 
       _logger.info('toggleInstance: Success - $id');
     } catch (e, stackTrace) {
@@ -151,8 +125,7 @@ class InstanceRemoteDataSource {
   }
 }
 
-final instanceRemoteDataSourceProvider =
-    Provider<InstanceRemoteDataSource>((ref) {
+final instanceRemoteDataSourceProvider = Provider<InstanceRemoteDataSource>((ref) {
   final apiClient = ref.watch(apiClientProvider);
   return InstanceRemoteDataSource(apiClient.dio);
 });

@@ -1,17 +1,16 @@
 import 'package:dio/dio.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flowdash_mobile/features/auth/presentation/providers/auth_provider.dart';
-import 'package:flowdash_mobile/features/workflows/domain/repositories/workflow_repository.dart';
-import 'package:flowdash_mobile/features/workflows/data/repositories/workflow_repository_impl.dart';
-import 'package:flowdash_mobile/features/workflows/data/datasources/workflow_remote_datasource.dart';
+import 'package:flowdash_mobile/features/instances/presentation/providers/instance_provider.dart';
 import 'package:flowdash_mobile/features/workflows/data/datasources/workflow_local_datasource.dart';
+import 'package:flowdash_mobile/features/workflows/data/datasources/workflow_remote_datasource.dart';
+import 'package:flowdash_mobile/features/workflows/data/repositories/workflow_repository_impl.dart';
 import 'package:flowdash_mobile/features/workflows/domain/entities/workflow.dart';
 import 'package:flowdash_mobile/features/workflows/domain/entities/workflow_execution.dart';
 import 'package:flowdash_mobile/features/workflows/domain/entities/workflow_with_instance.dart';
-import 'package:flowdash_mobile/features/instances/presentation/providers/instance_provider.dart';
+import 'package:flowdash_mobile/features/workflows/domain/repositories/workflow_repository.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-final workflowLocalDataSourceProvider =
-    Provider<WorkflowLocalDataSource>((ref) {
+final workflowLocalDataSourceProvider = Provider<WorkflowLocalDataSource>((ref) {
   return WorkflowLocalDataSource();
 });
 
@@ -41,13 +40,12 @@ final workflowsProvider = FutureProvider<List<Workflow>>((ref) async {
   return repository.getWorkflows(cancelToken: cancelToken);
 });
 
-final workflowProvider =
-    FutureProvider.family<Workflow, String>((ref, id) async {
+final workflowProvider = FutureProvider.family<Workflow, String>((ref, id) async {
   // Note: FutureProvider (not autoDispose) already persists by default
   // keepAlive() is redundant here but doesn't hurt - it ensures persistence
   // even if the provider type changes in the future
   ref.keepAlive();
-  
+
   final repository = ref.watch(workflowRepositoryProvider);
   final cancelToken = CancelToken();
 
@@ -67,106 +65,205 @@ final workflowProvider =
 
 // Provider that returns workflows with instance information for sorting and display
 // This is the main provider used by both home page and workflows page
-final workflowsWithInstanceProvider = FutureProvider<List<WorkflowWithInstance>>((ref) async {
-  final workflowRepository = ref.watch(workflowRepositoryProvider);
-  final instanceRepository = ref.watch(instanceRepositoryProvider);
-  final cancelToken = CancelToken();
-  
-  ref.onDispose(() {
-    if (!cancelToken.isCancelled) {
-      cancelToken.cancel('Provider disposed');
-    }
-  });
-  
-  // Get all instances
-  final allInstances = await instanceRepository.getInstances(cancelToken: cancelToken);
-  if (allInstances.isEmpty) {
-    return [];
-  }
-  
-  final allWorkflowsWithInstance = <WorkflowWithInstance>[];
-  
-  // Fetch workflows from all instances using the repository (which handles caching)
-  for (final instance in allInstances) {
-    try {
-      // Use getWorkflowsPaginated to get workflows for this instance
-      // We'll fetch a reasonable limit (100) to get all workflows
-      final result = await workflowRepository.getWorkflowsPaginated(
-        instanceId: instance.id,
-        limit: 100,
-        cursor: null,
-        cancelToken: cancelToken,
-      );
-      
-      for (final workflow in result.data) {
-        allWorkflowsWithInstance.add(WorkflowWithInstance(
-          workflow: workflow,
-          instanceId: instance.id,
-          instanceName: instance.name,
-        ));
+class WorkflowsWithInstanceNotifier extends AsyncNotifier<List<WorkflowWithInstance>> {
+  @override
+  Future<List<WorkflowWithInstance>> build() async {
+    final workflowRepository = ref.read(workflowRepositoryProvider);
+    final instanceRepository = ref.read(instanceRepositoryProvider);
+    final cancelToken = CancelToken();
+
+    ref.onDispose(() {
+      if (!cancelToken.isCancelled) {
+        cancelToken.cancel('Provider disposed');
       }
-    } catch (e) {
-      // Skip instances that fail - log but continue
-      // The repository already handles logging
+    });
+
+    // Get all instances
+    final allInstances = await instanceRepository.getInstances(cancelToken: cancelToken);
+    if (allInstances.isEmpty) {
+      return [];
     }
+
+    final allWorkflowsWithInstance = <WorkflowWithInstance>[];
+
+    // Fetch workflows from all enabled instances using the repository (which handles caching)
+    for (final instance in allInstances) {
+      // Skip disabled instances - don't fetch workflows for them
+      if (!instance.active) {
+        continue;
+      }
+
+      try {
+        // Use getWorkflowsPaginated to get workflows for this instance
+        // We'll fetch a reasonable limit (100) to get all workflows
+        final result = await workflowRepository.getWorkflowsPaginated(
+          instanceId: instance.id,
+          limit: 100,
+          cursor: null,
+          cancelToken: cancelToken,
+        );
+
+        for (final workflow in result.data) {
+          allWorkflowsWithInstance.add(
+            WorkflowWithInstance(
+              workflow: workflow,
+              instanceId: instance.id,
+              instanceName: instance.name,
+            ),
+          );
+        }
+      } catch (e) {
+        // Skip instances that fail - but ignore cancellation errors
+        // Cancellation errors are expected when provider is invalidated
+        if (e is DioException && e.type == DioExceptionType.cancel) {
+          // Re-throw cancellation to stop processing - provider is being invalidated
+          rethrow;
+        }
+        // Skip other errors - log but continue with other instances
+        // The repository already handles logging
+      }
+    }
+
+    // Sort: by instance name, then by active status (enabled first), then by name
+    allWorkflowsWithInstance.sort((a, b) {
+      final instanceCompare = a.instanceName.compareTo(b.instanceName);
+      if (instanceCompare != 0) return instanceCompare;
+
+      if (a.workflow.active != b.workflow.active) {
+        return b.workflow.active ? 1 : -1; // Active (enabled) first
+      }
+
+      return a.workflow.name.compareTo(b.workflow.name);
+    });
+
+    return allWorkflowsWithInstance;
   }
-  
-  // Sort: by instance name, then by active status (enabled first), then by name
-  allWorkflowsWithInstance.sort((a, b) {
-    final instanceCompare = a.instanceName.compareTo(b.instanceName);
-    if (instanceCompare != 0) return instanceCompare;
-    
-    if (a.workflow.active != b.workflow.active) {
-      return b.workflow.active ? 1 : -1; // Active (enabled) first
-    }
-    
-    return a.workflow.name.compareTo(b.workflow.name);
-  });
-  
-  return allWorkflowsWithInstance;
+
+  Future<void> refresh() async {
+    state = const AsyncValue.loading();
+    state = await AsyncValue.guard(() async {
+      final workflowRepository = ref.read(workflowRepositoryProvider);
+      final instanceRepository = ref.read(instanceRepositoryProvider);
+      
+      // Clear caches
+      await workflowRepository.refreshWorkflows();
+      await instanceRepository.refreshInstances();
+      
+      final cancelToken = CancelToken();
+      ref.onDispose(() {
+        if (!cancelToken.isCancelled) {
+          cancelToken.cancel('Provider disposed');
+        }
+      });
+
+      // Get all instances
+      final allInstances = await instanceRepository.getInstances(cancelToken: cancelToken);
+      if (allInstances.isEmpty) {
+        return [];
+      }
+
+      final allWorkflowsWithInstance = <WorkflowWithInstance>[];
+
+      // Fetch workflows from all enabled instances
+      for (final instance in allInstances) {
+        if (!instance.active) {
+          continue;
+        }
+
+        try {
+          final result = await workflowRepository.getWorkflowsPaginated(
+            instanceId: instance.id,
+            limit: 100,
+            cursor: null,
+            cancelToken: cancelToken,
+          );
+
+          for (final workflow in result.data) {
+            allWorkflowsWithInstance.add(
+              WorkflowWithInstance(
+                workflow: workflow,
+                instanceId: instance.id,
+                instanceName: instance.name,
+              ),
+            );
+          }
+        } catch (e) {
+          if (e is DioException && e.type == DioExceptionType.cancel) {
+            rethrow;
+          }
+        }
+      }
+
+      // Sort
+      allWorkflowsWithInstance.sort((a, b) {
+        final instanceCompare = a.instanceName.compareTo(b.instanceName);
+        if (instanceCompare != 0) return instanceCompare;
+
+        if (a.workflow.active != b.workflow.active) {
+          return b.workflow.active ? 1 : -1;
+        }
+
+        return a.workflow.name.compareTo(b.workflow.name);
+      });
+
+      return allWorkflowsWithInstance;
+    });
+  }
+}
+
+final workflowsWithInstanceProvider = AsyncNotifierProvider<WorkflowsWithInstanceNotifier, List<WorkflowWithInstance>>(() {
+  return WorkflowsWithInstanceNotifier();
 });
 
 // Execution providers
-final executionsProvider = FutureProvider.family<({List<WorkflowExecution> data, String? nextCursor}), ({String instanceId, String? workflowId, String? status, int limit, String? cursor})>((ref, params) async {
-  final repository = ref.watch(workflowRepositoryProvider);
-  final cancelToken = CancelToken();
+final executionsProvider =
+    FutureProvider.family<
+      ({List<WorkflowExecution> data, String? nextCursor}),
+      ({String instanceId, String? workflowId, String? status, int limit, String? cursor})
+    >((ref, params) async {
+      final repository = ref.watch(workflowRepositoryProvider);
+      final cancelToken = CancelToken();
 
-  ref.onDispose(() {
-    if (!cancelToken.isCancelled) {
-      cancelToken.cancel('Provider disposed');
-    }
-  });
+      ref.onDispose(() {
+        if (!cancelToken.isCancelled) {
+          cancelToken.cancel('Provider disposed');
+        }
+      });
 
-  return repository.getExecutions(
-    instanceId: params.instanceId,
-    workflowId: params.workflowId,
-    status: params.status,
-    limit: params.limit,
-    cursor: params.cursor,
-    cancelToken: cancelToken,
-  );
-});
+      return repository.getExecutions(
+        instanceId: params.instanceId,
+        workflowId: params.workflowId,
+        status: params.status,
+        limit: params.limit,
+        cursor: params.cursor,
+        cancelToken: cancelToken,
+      );
+    });
 
-final executionProvider = FutureProvider.family<WorkflowExecution, ({String executionId, String instanceId})>((ref, params) async {
-  // Note: FutureProvider (not autoDispose) already persists by default
-  // keepAlive() ensures persistence even if provider type changes
-  // invalidate() will still trigger refetch (calls onDispose and recomputes)
-  ref.keepAlive();
-  
-  final repository = ref.watch(workflowRepositoryProvider);
-  final cancelToken = CancelToken();
+final executionProvider =
+    FutureProvider.family<WorkflowExecution, ({String executionId, String instanceId})>((
+      ref,
+      params,
+    ) async {
+      // Note: FutureProvider (not autoDispose) already persists by default
+      // keepAlive() ensures persistence even if provider type changes
+      // invalidate() will still trigger refetch (calls onDispose and recomputes)
+      ref.keepAlive();
 
-  // onDispose is called when provider is invalidated or recomputed
-  // With keepAlive(), it won't be called just because listeners are removed
-  ref.onDispose(() {
-    if (!cancelToken.isCancelled) {
-      cancelToken.cancel('Provider invalidated or recomputed');
-    }
-  });
+      final repository = ref.watch(workflowRepositoryProvider);
+      final cancelToken = CancelToken();
 
-  return repository.getExecutionById(
-    executionId: params.executionId,
-    instanceId: params.instanceId,
-    cancelToken: cancelToken,
-  );
-});
+      // onDispose is called when provider is invalidated or recomputed
+      // With keepAlive(), it won't be called just because listeners are removed
+      ref.onDispose(() {
+        if (!cancelToken.isCancelled) {
+          cancelToken.cancel('Provider invalidated or recomputed');
+        }
+      });
+
+      return repository.getExecutionById(
+        executionId: params.executionId,
+        instanceId: params.instanceId,
+        cancelToken: cancelToken,
+      );
+    });

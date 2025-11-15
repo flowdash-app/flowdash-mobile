@@ -1,10 +1,11 @@
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_crashlytics/firebase_crashlytics.dart';
 import 'package:firebase_performance/firebase_performance.dart';
-import 'package:flowdash_mobile/core/routing/router_config.dart';
-import 'package:flowdash_mobile/core/utils/logger.dart';
 import 'package:flowdash_mobile/core/analytics/analytics_consent_service.dart';
+import 'package:flowdash_mobile/core/notifications/push_notification_provider.dart';
+import 'package:flowdash_mobile/core/routing/router_config.dart';
 import 'package:flowdash_mobile/core/storage/local_storage.dart';
+import 'package:flowdash_mobile/core/utils/logger.dart';
 import 'package:flowdash_mobile/features/auth/presentation/providers/auth_provider.dart';
 import 'package:flowdash_mobile/shared/theme/app_theme.dart';
 import 'package:flutter/foundation.dart';
@@ -47,9 +48,7 @@ void main() async {
 
   runApp(
     ProviderScope(
-      overrides: [
-        sharedPreferencesProvider.overrideWithValue(sharedPreferences),
-      ],
+      overrides: [sharedPreferencesProvider.overrideWithValue(sharedPreferences)],
       child: const FlowDashApp(),
     ),
   );
@@ -62,6 +61,10 @@ class FlowDashApp extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final router = ref.watch(routerProvider);
     final analytics = ref.read(analyticsServiceProvider);
+    final pushNotificationService = ref.read(pushNotificationServiceProvider);
+
+    // Initialize push notifications (handlers only, no permission request)
+    pushNotificationService.initialize();
 
     // Set user ID when auth state changes
     // Using ref.listen ensures proper subscription management - Riverpod
@@ -80,9 +83,10 @@ class FlowDashApp extends ConsumerWidget {
       title: 'FlowDash',
       theme: AppTheme.lightTheme,
       darkTheme: AppTheme.darkTheme,
+
       themeMode: ThemeMode.system,
       routerConfig: router,
-      debugShowCheckedModeBanner: false,
+      debugShowCheckedModeBanner: kDebugMode,
     );
   }
 }
