@@ -99,7 +99,7 @@ class _WorkflowsPageState extends ConsumerState<WorkflowsPage> {
                       wrapInCard: true,
                       showTrailing: true,
                     ),
-                    childCount: 5,
+                    childCount: 3,
                   ),
                 ),
                 error: (error, stack) {

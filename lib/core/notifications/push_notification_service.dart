@@ -140,6 +140,11 @@ class PushNotificationService {
       final granted = settings.authorizationStatus == AuthorizationStatus.authorized;
       _logger.info('requestPermissionWithRationale: ${granted ? "Granted" : "Denied"}');
 
+      // If permission granted, register device token immediately
+      if (granted) {
+        await registerDeviceToken();
+      }
+
       return granted;
     } catch (e, stackTrace) {
       _logger.severe('requestPermissionWithRationale: Failure', e, stackTrace);

@@ -18,6 +18,7 @@ class ShimmerListTile extends StatelessWidget {
     final tile = Shimmer.fromColors(
       baseColor: Colors.grey[300]!,
       highlightColor: Colors.grey[100]!,
+      period: const Duration(milliseconds: 1500),
       child: ListTile(
         leading: showLeading
             ? const CircleAvatar(
