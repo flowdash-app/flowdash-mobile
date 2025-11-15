@@ -1,4 +1,3 @@
-import 'package:flowdash_mobile/core/notifications/push_notification_provider.dart';
 import 'package:flowdash_mobile/features/auth/presentation/providers/auth_provider.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -29,13 +28,6 @@ class _GoogleSignInButtonState extends ConsumerState<GoogleSignInButton> {
         action: 'sign_in_with_google',
       );
       trace?.stop();
-
-      // Request notification permission after successful login
-      if (mounted) {
-        final pushService = ref.read(pushNotificationServiceProvider);
-        await pushService.requestPermissionWithRationale(context);
-        // Device token will be registered automatically in main.dart if permission granted
-      }
     } on GoogleSignInException catch (e) {
       // Handle Google Sign-In specific errors
       if (e.code == GoogleSignInExceptionCode.canceled) {

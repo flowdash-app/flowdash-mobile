@@ -111,6 +111,22 @@ class LocalStorage {
     return _prefs.getBool(AppConstants.analyticsConsentKey) ?? false;
   }
 
+  // Notification permission request tracking
+  Future<void> setHasRequestedNotificationPermission(bool value) async {
+    _logger.info('setHasRequestedNotificationPermission: Entry - $value');
+    try {
+      await _prefs.setBool(AppConstants.hasRequestedNotificationPermissionKey, value);
+      _logger.info('setHasRequestedNotificationPermission: Success');
+    } catch (e, stackTrace) {
+      _logger.severe('setHasRequestedNotificationPermission: Failure', e, stackTrace);
+      rethrow;
+    }
+  }
+
+  bool hasRequestedNotificationPermission() {
+    return _prefs.getBool(AppConstants.hasRequestedNotificationPermissionKey) ?? false;
+  }
+
   // Generic cache methods
   Future<void> saveString(String key, String value) async {
     await _prefs.setString('${AppConstants.storagePrefix}$key', value);

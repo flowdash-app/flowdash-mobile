@@ -1,6 +1,11 @@
+import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:logging/logging.dart';
+import 'package:flowdash_mobile/core/notifications/push_notification_provider.dart';
 import 'package:flowdash_mobile/core/routing/app_router.dart';
+import 'package:flowdash_mobile/core/storage/local_storage_provider.dart';
+import 'package:flowdash_mobile/core/utils/logger.dart';
 import 'package:flowdash_mobile/features/auth/presentation/providers/auth_provider.dart';
 import 'package:flowdash_mobile/features/workflows/presentation/providers/workflow_provider.dart';
 import 'package:flowdash_mobile/features/workflows/presentation/widgets/workflow_list_tile.dart';
@@ -19,6 +24,9 @@ class HomeTabContent extends ConsumerStatefulWidget {
 }
 
 class _HomeTabContentState extends ConsumerState<HomeTabContent> {
+  bool _hasCheckedNotificationPermission = false;
+  final Logger _logger = AppLogger.getLogger('HomeTabContent');
+
   @override
   void initState() {
     super.initState();
@@ -31,11 +39,68 @@ class _HomeTabContentState extends ConsumerState<HomeTabContent> {
     });
   }
 
+  Future<void> _checkAndRequestNotificationPermission() async {
+    // Only check once per widget lifecycle
+    if (_hasCheckedNotificationPermission) return;
+    _hasCheckedNotificationPermission = true;
+
+    final instancesAsync = ref.read(instancesProvider);
+    final localStorage = ref.read(localStorageProvider);
+    final pushService = ref.read(pushNotificationServiceProvider);
+
+    // Wait for instances to load
+    await instancesAsync.when(
+      data: (instances) async {
+        // Only request if user has at least one instance
+        if (instances.isNotEmpty) {
+          // Check if we've already requested permission
+          final hasRequested = localStorage.hasRequestedNotificationPermission();
+          
+          if (!hasRequested) {
+            // Check current permission status
+            final notificationSettings = await FirebaseMessaging.instance.getNotificationSettings();
+            
+            // Only request if not already authorized or denied
+            if (notificationSettings.authorizationStatus != AuthorizationStatus.authorized &&
+                notificationSettings.authorizationStatus != AuthorizationStatus.denied) {
+              // Request permission with rationale (check mounted before using context)
+              if (mounted) {
+                final granted = await pushService.requestPermissionWithRationale(context);
+                
+                // Mark that we've requested (regardless of whether granted or not)
+                await localStorage.setHasRequestedNotificationPermission(true);
+                
+                if (granted) {
+                  // Device token will be registered automatically by pushService
+                  _logger.info('Notification permission granted on home page');
+                }
+              }
+            } else {
+              // Already authorized or denied, mark as requested
+              await localStorage.setHasRequestedNotificationPermission(true);
+            }
+          }
+        }
+      },
+      loading: () {},
+      error: (_, __) {},
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final workflowsAsync = ref.watch(workflowsWithInstanceProvider);
     final instancesAsync = ref.watch(instancesProvider);
     final authState = ref.watch(authStateProvider);
+
+    // Check and request notification permission when instances are loaded
+    instancesAsync.whenData((instances) {
+      if (instances.isNotEmpty && !_hasCheckedNotificationPermission) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          _checkAndRequestNotificationPermission();
+        });
+      }
+    });
 
     return Scaffold(
       body: RefreshIndicator(

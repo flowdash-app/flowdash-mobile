@@ -11,6 +11,7 @@ class AppConstants {
   static const String hasSetInstanceKey = '${storagePrefix}has_set_instance';
   static const String hasCompletedOnboardingKey = '${storagePrefix}has_completed_onboarding';
   static const String analyticsConsentKey = '${storagePrefix}analytics_consent';
+  static const String hasRequestedNotificationPermissionKey = '${storagePrefix}has_requested_notification_permission';
 
   // Deep Link Scheme
   static const String deepLinkScheme = 'flowdash';
