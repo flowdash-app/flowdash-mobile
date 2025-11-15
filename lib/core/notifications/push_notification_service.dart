@@ -96,10 +96,9 @@ class PushNotificationService {
         return true;
       }
 
-      if (currentSettings.authorizationStatus == AuthorizationStatus.denied) {
-        _logger.info('requestPermissionWithRationale: Previously denied');
-        return false;
-      }
+      // Note: On first launch, authorizationStatus is 'denied' but that just means
+      // "not yet asked" - we should still show the rationale and request permission.
+      // Only skip if user explicitly denied after we asked (handled by caller).
 
       // Show rationale dialog
       if (!context.mounted) {
