@@ -7,6 +7,7 @@ import 'package:flowdash_mobile/features/settings/presentation/pages/about_page.
 import 'package:flowdash_mobile/features/settings/presentation/pages/analytics_consent_page.dart';
 import 'package:flowdash_mobile/features/settings/presentation/pages/privacy_policy_page.dart';
 import 'package:flowdash_mobile/features/settings/presentation/pages/terms_of_service_page.dart';
+import 'package:flowdash_mobile/features/subscriptions/presentation/pages/plans_page.dart';
 import 'package:flowdash_mobile/features/workflows/presentation/pages/workflow_details_page.dart';
 import 'package:flowdash_mobile/features/workflows/presentation/widgets/execution_details_bottom_sheet.dart';
 import 'package:flutter/material.dart';
@@ -171,4 +172,60 @@ class AboutRoute extends GoRouteData with $AboutRoute {
 
   @override
   Widget build(BuildContext context, GoRouterState state) => const AboutPage();
+}
+
+@TypedGoRoute<PlansRoute>(path: '/plans')
+class PlansRoute extends GoRouteData with $PlansRoute {
+  const PlansRoute();
+
+  @override
+  Widget build(BuildContext context, GoRouterState state) => const PlansPage();
+}
+
+/// Error Workflow Onboarding Route
+/// 
+/// Note: This route receives instanceId as a path parameter.
+/// The page needs Instance and SubscriptionModel objects which should be
+/// fetched from providers in the build method using WidgetRef.
+@TypedGoRoute<ErrorWorkflowOnboardingRoute>(path: '/error-workflow-onboarding/:instanceId')
+class ErrorWorkflowOnboardingRoute extends GoRouteData with $ErrorWorkflowOnboardingRoute {
+  final String instanceId;
+
+  const ErrorWorkflowOnboardingRoute({required this.instanceId});
+
+  @override
+  Widget build(BuildContext context, GoRouterState state) {
+    // TODO: Fetch instance and subscription from providers using instanceId
+    // For now, returning a placeholder that needs to be completed
+    // The actual implementation should use Consumer/ConsumerWidget to
+    // fetch Instance and SubscriptionModel from Riverpod providers
+    
+    // Placeholder return - this will cause build errors until properly implemented
+    throw UnimplementedError(
+      'ErrorWorkflowOnboardingRoute needs to fetch Instance and SubscriptionModel '
+      'from providers before passing to ErrorWorkflowOnboardingPage. '
+      'Use ConsumerWidget or ref.watch in the build method.'
+    );
+    
+    // Example of proper implementation:
+    // return Consumer(
+    //   builder: (context, ref, child) {
+    //     final instanceAsync = ref.watch(instanceProvider(instanceId));
+    //     final subscriptionAsync = ref.watch(subscriptionProvider);
+    //     
+    //     return instanceAsync.when(
+    //       data: (instance) => subscriptionAsync.when(
+    //         data: (subscription) => ErrorWorkflowOnboardingPage(
+    //           instance: instance,
+    //           subscription: subscription,
+    //         ),
+    //         loading: () => const Scaffold(body: Center(child: CircularProgressIndicator())),
+    //         error: (e, s) => Scaffold(body: Center(child: Text('Error: $e'))),
+    //       ),
+    //       loading: () => const Scaffold(body: Center(child: CircularProgressIndicator())),
+    //       error: (e, s) => Scaffold(body: Center(child: Text('Error: $e'))),
+    //     );
+    //   },
+    // );
+  }
 }

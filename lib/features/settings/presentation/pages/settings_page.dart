@@ -55,6 +55,23 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
               ),
             ),
 
+          // Subscription & Plans
+          ListTile(
+            leading: const Icon(Icons.card_membership),
+            title: const Text('Subscription'),
+            subtitle: const Text('Manage your plan and billing'),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () {
+              analytics.logEvent(
+                name: 'settings_action',
+                parameters: {'action_type': 'view_plans'},
+              );
+              const PlansRoute().push(context);
+            },
+          ),
+
+          const Divider(),
+
           // Analytics Consent
           ListTile(
             leading: const Icon(Icons.analytics),
