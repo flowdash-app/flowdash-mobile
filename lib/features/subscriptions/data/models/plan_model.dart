@@ -8,8 +8,8 @@ sealed class PlanModel with _$PlanModel {
   const factory PlanModel({
     required String tier,
     required String name,
-    required double priceMonthly,
-    required double priceYearly,
+    @JsonKey(name: 'price_monthly') required double priceMonthly,
+    @JsonKey(name: 'price_yearly') required double priceYearly,
     required List<String> features,
     @Default(false) bool recommended,
   }) = _PlanModel;
