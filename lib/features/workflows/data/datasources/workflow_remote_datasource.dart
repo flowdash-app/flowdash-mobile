@@ -207,6 +207,40 @@ class WorkflowRemoteDataSource {
       rethrow;
     }
   }
+
+  Future<String> retryExecution({
+    required String executionId,
+    required String instanceId,
+    CancelToken? cancelToken,
+  }) async {
+    _logger.info('retryExecution: Entry - executionId: $executionId, instanceId: $instanceId');
+
+    try {
+      // Use POST with body for secure instance_id handling
+      final response = await _dio.post(
+        '/workflows/executions/$executionId/retry',
+        data: {
+          'instance_id': instanceId,
+        },
+        cancelToken: cancelToken,
+      );
+
+      // Extract new execution ID from response
+      final newExecutionId = response.data['new_execution_id'] as String?;
+      
+      if (newExecutionId == null || newExecutionId.isEmpty) {
+        throw FormatException(
+          'Invalid response: new_execution_id not found in response',
+        );
+      }
+
+      _logger.info('retryExecution: Success - executionId: $executionId, newExecutionId: $newExecutionId');
+      return newExecutionId;
+    } catch (e, stackTrace) {
+      _logger.severe('retryExecution: Failure', e, stackTrace);
+      rethrow;
+    }
+  }
 }
 
 final workflowRemoteDataSourceProvider =

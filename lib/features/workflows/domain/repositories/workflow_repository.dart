@@ -29,4 +29,9 @@ abstract class WorkflowRepository {
     bool includeData = true,
     CancelToken? cancelToken,
   });
+  Future<String> retryExecution({
+    required String executionId,
+    required String instanceId,
+    CancelToken? cancelToken,
+  });
 }

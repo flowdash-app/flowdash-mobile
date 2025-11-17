@@ -450,4 +450,52 @@ class WorkflowRepositoryImpl implements WorkflowRepository {
       rethrow;
     }
   }
+
+  @override
+  Future<String> retryExecution({
+    required String executionId,
+    required String instanceId,
+    CancelToken? cancelToken,
+  }) async {
+    final trace = _analytics.startTrace('retry_execution');
+    trace?.start();
+
+    _logger.info(
+      'retryExecution: Entry - executionId: $executionId, instanceId: $instanceId',
+    );
+
+    try {
+      final newExecutionId = await _remoteDataSource.retryExecution(
+        executionId: executionId,
+        instanceId: instanceId,
+        cancelToken: cancelToken,
+      );
+
+      _logger.info(
+        'retryExecution: Success - executionId: $executionId, newExecutionId: $newExecutionId',
+      );
+      await _analytics.logSuccess(
+        action: 'retry_execution',
+        parameters: {
+          'execution_id': executionId,
+          'instance_id': instanceId,
+          'new_execution_id': newExecutionId,
+        },
+      );
+      trace?.stop();
+      return newExecutionId;
+    } catch (e, stackTrace) {
+      await _analytics.logFailure(
+        action: 'retry_execution',
+        error: e.toString(),
+        parameters: {
+          'execution_id': executionId,
+          'instance_id': instanceId,
+        },
+      );
+      trace?.stop();
+      _logger.severe('retryExecution: Failure', e, stackTrace);
+      rethrow;
+    }
+  }
 }

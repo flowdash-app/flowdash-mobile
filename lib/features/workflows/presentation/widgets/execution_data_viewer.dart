@@ -24,17 +24,17 @@ class _ExecutionDataViewerState extends State<ExecutionDataViewer> {
       return Container(
         padding: const EdgeInsets.all(16.0),
         decoration: BoxDecoration(
-          color: Colors.grey[100],
+          color: Theme.of(context).colorScheme.surfaceContainerHighest,
           borderRadius: BorderRadius.circular(8),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text(
+            Text(
               'No execution data available',
               style: TextStyle(
                 fontSize: 12,
-                color: Colors.grey,
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
                 fontWeight: FontWeight.w500,
               ),
             ),
@@ -46,7 +46,7 @@ class _ExecutionDataViewerState extends State<ExecutionDataViewer> {
               '• There was an error parsing the data',
               style: TextStyle(
                 fontSize: 11,
-                color: Colors.grey[600],
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
               ),
             ),
           ],
@@ -62,17 +62,17 @@ class _ExecutionDataViewerState extends State<ExecutionDataViewer> {
       return Container(
         padding: const EdgeInsets.all(16.0),
         decoration: BoxDecoration(
-          color: Colors.grey[100],
+          color: Theme.of(context).colorScheme.surfaceContainerHighest,
           borderRadius: BorderRadius.circular(8),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text(
+            Text(
               'Execution data structure is empty',
               style: TextStyle(
                 fontSize: 12,
-                color: Colors.grey,
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
                 fontWeight: FontWeight.w500,
               ),
             ),
@@ -81,7 +81,7 @@ class _ExecutionDataViewerState extends State<ExecutionDataViewer> {
               'Data object exists but contains no displayable fields.',
               style: TextStyle(
                 fontSize: 11,
-                color: Colors.grey[600],
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
               ),
             ),
             const SizedBox(height: 8),
@@ -148,7 +148,7 @@ class _ExecutionDataViewerState extends State<ExecutionDataViewer> {
               '${value.length} ${value.length == 1 ? 'item' : 'items'}',
               style: TextStyle(
                 fontSize: 12,
-                color: Colors.grey[600],
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
               ),
             ),
             initiallyExpanded: isExpanded,
@@ -179,14 +179,15 @@ class _ExecutionDataViewerState extends State<ExecutionDataViewer> {
                     Container(
                       padding: const EdgeInsets.all(12.0),
                       decoration: BoxDecoration(
-                        color: Colors.grey[100],
+                        color: Theme.of(context).colorScheme.surfaceContainerHighest,
                         borderRadius: BorderRadius.circular(8),
                       ),
                       child: SelectableText(
                         _formatJson(value),
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 11,
                           fontFamily: 'monospace',
+                          color: Theme.of(context).colorScheme.onSurface,
                         ),
                       ),
                     ),
@@ -213,7 +214,7 @@ class _ExecutionDataViewerState extends State<ExecutionDataViewer> {
               '${value.length} ${value.length == 1 ? 'item' : 'items'}',
               style: TextStyle(
                 fontSize: 12,
-                color: Colors.grey[600],
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
               ),
             ),
             initiallyExpanded: isExpanded,
@@ -244,14 +245,15 @@ class _ExecutionDataViewerState extends State<ExecutionDataViewer> {
                     Container(
                       padding: const EdgeInsets.all(12.0),
                       decoration: BoxDecoration(
-                        color: Colors.grey[100],
+                        color: Theme.of(context).colorScheme.surfaceContainerHighest,
                         borderRadius: BorderRadius.circular(8),
                       ),
                       child: SelectableText(
                         _formatJson(value),
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 11,
                           fontFamily: 'monospace',
+                          color: Theme.of(context).colorScheme.onSurface,
                         ),
                       ),
                     ),
@@ -276,9 +278,10 @@ class _ExecutionDataViewerState extends State<ExecutionDataViewer> {
               padding: const EdgeInsets.only(top: 4.0),
               child: SelectableText(
                 _formatValue(value),
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 12,
                   fontFamily: 'monospace',
+                  color: Theme.of(context).colorScheme.onSurface,
                 ),
               ),
             ),

@@ -2,6 +2,7 @@ import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flowdash_mobile/core/routing/app_router.dart';
+import 'package:flowdash_mobile/features/auth/presentation/providers/auth_provider.dart';
 import 'package:flowdash_mobile/features/workflows/domain/entities/workflow.dart';
 import 'package:flowdash_mobile/features/workflows/presentation/providers/workflow_provider.dart';
 import 'package:flowdash_mobile/features/instances/presentation/providers/instance_provider.dart';
@@ -52,7 +53,72 @@ class WorkflowListTile extends ConsumerWidget {
     }
   }
 
+  Future<bool> _showDisableConfirmation(BuildContext context) async {
+    if (!context.mounted) return false;
+    
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Disable Workflow'),
+        content: const Text(
+          'Are you sure you want to disable this workflow? It will stop running until you enable it again.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            style: TextButton.styleFrom(
+              foregroundColor: Colors.red,
+            ),
+            child: const Text('Disable'),
+          ),
+        ],
+      ),
+    );
+    
+    return confirmed ?? false;
+  }
+
   Future<void> _handleToggle(BuildContext context, WidgetRef ref, bool value) async {
+    final analytics = ref.read(analyticsServiceProvider);
+    
+    // Log analytics for tap action
+    await analytics.logEvent(
+      name: value ? 'workflow_enable_tapped' : 'workflow_disable_tapped',
+      parameters: {
+        'workflow_id': workflow.id,
+        if (instanceId != null) 'instance_id': instanceId!,
+      },
+    );
+    
+    // Show confirmation dialog when disabling
+    if (!value) {
+      final confirmed = await _showDisableConfirmation(context);
+      if (!confirmed || !context.mounted) {
+        // User cancelled or context unmounted, revert the switch
+        await analytics.logEvent(
+          name: 'workflow_disable_cancelled',
+          parameters: {
+            'workflow_id': workflow.id,
+            if (instanceId != null) 'instance_id': instanceId!,
+          },
+        );
+        return;
+      }
+      
+      // Log confirmation
+      await analytics.logEvent(
+        name: 'workflow_disable_confirmed',
+        parameters: {
+          'workflow_id': workflow.id,
+          if (instanceId != null) 'instance_id': instanceId!,
+        },
+      );
+    }
+
     if (onToggle != null) {
       onToggle!(workflow.id, value);
       return;

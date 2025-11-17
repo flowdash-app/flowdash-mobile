@@ -14,9 +14,13 @@ class ErrorInterceptor extends Interceptor {
         );
         break;
       case DioExceptionType.connectionTimeout:
+        exception = NetworkException('Connection timeout - Unable to connect to server');
+        break;
       case DioExceptionType.sendTimeout:
+        exception = NetworkException('Send timeout - Request took too long to send');
+        break;
       case DioExceptionType.receiveTimeout:
-        exception = NetworkException('Connection timeout');
+        exception = NetworkException('Receive timeout - Server took too long to respond');
         break;
       case DioExceptionType.badResponse:
         final statusCode = err.response?.statusCode;

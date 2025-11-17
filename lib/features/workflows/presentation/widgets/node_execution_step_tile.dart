@@ -1,7 +1,8 @@
-import 'package:flutter/material.dart';
 import 'dart:convert';
+
 import 'package:flowdash_mobile/features/workflows/data/models/execution_data_models.dart';
 import 'package:flowdash_mobile/shared/widgets/info_row.dart';
+import 'package:flutter/material.dart';
 
 class NodeExecutionStepTile extends StatelessWidget {
   final String nodeName;
@@ -26,16 +27,8 @@ class NodeExecutionStepTile extends StatelessWidget {
     return Card(
       margin: const EdgeInsets.only(bottom: 8.0),
       child: ExpansionTile(
-        leading: Icon(
-          statusIcon,
-          color: statusColor,
-        ),
-        title: Text(
-          nodeName,
-          style: const TextStyle(
-            fontWeight: FontWeight.w500,
-          ),
-        ),
+        leading: Icon(statusIcon, color: statusColor),
+        title: Text(nodeName, style: const TextStyle(fontWeight: FontWeight.w500)),
         subtitle: Row(
           children: [
             Container(
@@ -43,15 +36,10 @@ class NodeExecutionStepTile extends StatelessWidget {
               decoration: BoxDecoration(
                 color: statusColor.withOpacity(0.1),
                 borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: statusColor.withOpacity(0.3)),
               ),
               child: Text(
                 statusText,
-                style: TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
-                  color: statusColor,
-                ),
+                style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: statusColor),
               ),
             ),
           ],
@@ -64,12 +52,8 @@ class NodeExecutionStepTile extends StatelessWidget {
               children: [
                 // Node type if available
                 if (nodeData.type != null)
-                  InfoRow(
-                    label: 'Type',
-                    value: nodeData.type!,
-                    labelWidth: 80,
-                  ),
-                
+                  InfoRow(label: 'Type', value: nodeData.type!, labelWidth: 80),
+
                 // Error message if available
                 if (hasNodeError && nodeData.error != null)
                   Padding(
@@ -77,9 +61,11 @@ class NodeExecutionStepTile extends StatelessWidget {
                     child: Container(
                       padding: const EdgeInsets.all(12.0),
                       decoration: BoxDecoration(
-                        color: Colors.red[50],
+                        color: Theme.of(context).colorScheme.errorContainer,
                         borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: Colors.red[300]!),
+                        border: Border.all(
+                          color: Theme.of(context).colorScheme.error.withOpacity(0.3),
+                        ),
                       ),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -89,7 +75,7 @@ class NodeExecutionStepTile extends StatelessWidget {
                               Icon(
                                 Icons.error_outline,
                                 size: 16,
-                                color: Colors.red[700],
+                                color: Theme.of(context).colorScheme.onErrorContainer,
                               ),
                               const SizedBox(width: 4),
                               Text(
@@ -97,7 +83,7 @@ class NodeExecutionStepTile extends StatelessWidget {
                                 style: TextStyle(
                                   fontSize: 12,
                                   fontWeight: FontWeight.w600,
-                                  color: Colors.red[700],
+                                  color: Theme.of(context).colorScheme.onErrorContainer,
                                 ),
                               ),
                             ],
@@ -107,7 +93,7 @@ class NodeExecutionStepTile extends StatelessWidget {
                             nodeData.error!,
                             style: TextStyle(
                               fontSize: 12,
-                              color: Colors.red[700],
+                              color: Theme.of(context).colorScheme.onErrorContainer,
                             ),
                           ),
                         ],
@@ -124,22 +110,23 @@ class NodeExecutionStepTile extends StatelessWidget {
                       children: [
                         Text(
                           'Data Preview',
-                          style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                                fontWeight: FontWeight.w600,
-                              ),
+                          style: Theme.of(
+                            context,
+                          ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600),
                         ),
                         const SizedBox(height: 4),
                         Container(
                           padding: const EdgeInsets.all(12.0),
                           decoration: BoxDecoration(
-                            color: Colors.grey[100],
+                            color: Theme.of(context).colorScheme.surfaceContainerHighest,
                             borderRadius: BorderRadius.circular(8),
                           ),
                           child: SelectableText(
                             _formatNodeData(nodeData),
-                            style: const TextStyle(
+                            style: TextStyle(
                               fontSize: 12,
                               fontFamily: 'monospace',
+                              color: Theme.of(context).colorScheme.onSurface,
                             ),
                           ),
                         ),
@@ -152,22 +139,22 @@ class NodeExecutionStepTile extends StatelessWidget {
                   Padding(
                     padding: const EdgeInsets.only(top: 8.0),
                     child: ExpansionTile(
-                      title: const Text(
-                        'Full Node Data',
-                        style: TextStyle(fontSize: 12),
-                      ),
+                      title: const Text('Full Node Data', style: TextStyle(fontSize: 12)),
+                      childrenPadding: EdgeInsets.zero,
                       children: [
                         Container(
+                          width: double.infinity,
                           padding: const EdgeInsets.all(12.0),
                           decoration: BoxDecoration(
-                            color: Colors.grey[100],
+                            color: Theme.of(context).colorScheme.surfaceContainerHighest,
                             borderRadius: BorderRadius.circular(8),
                           ),
                           child: SelectableText(
                             _formatJson(nodeData),
-                            style: const TextStyle(
+                            style: TextStyle(
                               fontSize: 11,
                               fontFamily: 'monospace',
+                              color: Theme.of(context).colorScheme.onSurface,
                             ),
                           ),
                         ),
@@ -205,9 +192,7 @@ class NodeExecutionStepTile extends StatelessWidget {
       final encoder = JsonEncoder.withIndent('  ');
       final map = <String, dynamic>{};
       if (nodeData.main != null) {
-        map['main'] = nodeData.main!.map((list) => 
-          list.map((item) => item.json).toList()
-        ).toList();
+        map['main'] = nodeData.main!.map((list) => list.map((item) => item.json).toList()).toList();
       }
       if (nodeData.type != null) map['type'] = nodeData.type;
       if (nodeData.error != null) map['error'] = nodeData.error;
@@ -217,4 +202,3 @@ class NodeExecutionStepTile extends StatelessWidget {
     }
   }
 }
-

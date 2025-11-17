@@ -29,6 +29,7 @@ class WorkflowDetailsPage extends ConsumerStatefulWidget {
 class _WorkflowDetailsPageState extends ConsumerState<WorkflowDetailsPage>
     with PaginationHelper<WorkflowExecution> {
   int _executionLimit = 10; // Default limit
+  bool? _pendingToggleValue; // Track pending toggle during confirmation
 
   @override
   void initState() {
@@ -43,6 +44,8 @@ class _WorkflowDetailsPageState extends ConsumerState<WorkflowDetailsPage>
   }
 
   Future<void> _loadExecutions({bool loadMore = false}) async {
+    if (!mounted) return;
+    
     final repository = ref.read(workflowRepositoryProvider);
 
     if (loadMore) {
@@ -54,7 +57,11 @@ class _WorkflowDetailsPageState extends ConsumerState<WorkflowDetailsPage>
           limit: _executionLimit,
           cursor: cursor,
         ),
-        onStateChanged: (state) => setState(() {}),
+        onStateChanged: (state) {
+          if (mounted) {
+            setState(() {});
+          }
+        },
       );
     } else {
       await loadInitial(
@@ -65,7 +72,11 @@ class _WorkflowDetailsPageState extends ConsumerState<WorkflowDetailsPage>
           limit: _executionLimit,
           cursor: null,
         ),
-        onStateChanged: (state) => setState(() {}),
+        onStateChanged: (state) {
+          if (mounted) {
+            setState(() {});
+          }
+        },
       );
     }
   }
@@ -117,7 +128,85 @@ class _WorkflowDetailsPageState extends ConsumerState<WorkflowDetailsPage>
     return errorString.contains('not found') || errorString.contains('404');
   }
 
+  Future<bool> _showDisableConfirmation() async {
+    if (!mounted) return false;
+    
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Disable Workflow'),
+        content: const Text(
+          'Are you sure you want to disable this workflow? It will stop running until you enable it again.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            style: TextButton.styleFrom(
+              foregroundColor: Colors.red,
+            ),
+            child: const Text('Disable'),
+          ),
+        ],
+      ),
+    );
+    
+    return confirmed ?? false;
+  }
+
   Future<void> _handleToggle(bool value) async {
+    final analytics = ref.read(analyticsServiceProvider);
+    
+    // Log analytics for tap action
+    await analytics.logEvent(
+      name: value ? 'workflow_enable_tapped' : 'workflow_disable_tapped',
+      parameters: {
+        'workflow_id': widget.workflowId,
+        'instance_id': widget.instanceId,
+      },
+    );
+    
+    // Show confirmation dialog when disabling
+    if (!value) {
+      // Set pending toggle to show immediate visual feedback
+      setState(() {
+        _pendingToggleValue = value;
+      });
+      
+      final confirmed = await _showDisableConfirmation();
+      if (!confirmed || !mounted) {
+        // User cancelled or widget unmounted, revert the switch
+        await analytics.logEvent(
+          name: 'workflow_disable_cancelled',
+          parameters: {
+            'workflow_id': widget.workflowId,
+            'instance_id': widget.instanceId,
+          },
+        );
+        setState(() {
+          _pendingToggleValue = null;
+        });
+        return;
+      }
+      
+      // Log confirmation
+      await analytics.logEvent(
+        name: 'workflow_disable_confirmed',
+        parameters: {
+          'workflow_id': widget.workflowId,
+          'instance_id': widget.instanceId,
+        },
+      );
+      
+      // Clear pending toggle as we're proceeding
+      setState(() {
+        _pendingToggleValue = null;
+      });
+    }
+
     final repository = ref.read(workflowRepositoryProvider);
     try {
       await repository.toggleWorkflow(widget.workflowId, value, instanceId: widget.instanceId);
@@ -164,11 +253,14 @@ class _WorkflowDetailsPageState extends ConsumerState<WorkflowDetailsPage>
           // Don't refresh if the current state is a 404 error
           if (!_isNotFoundError(workflowAsync)) {
             // Clear cache to force fresh fetch
+            if (!mounted) return;
             final repository = ref.read(workflowRepositoryProvider);
             await repository.refreshWorkflows();
+            if (!mounted) return;
             // Invalidate provider to trigger refetch with fresh data
             ref.invalidate(workflowProvider(widget.workflowId));
             await ref.read(workflowProvider(widget.workflowId).future);
+            if (!mounted) return;
             // Reload executions
             _loadExecutions();
           }
@@ -181,7 +273,10 @@ class _WorkflowDetailsPageState extends ConsumerState<WorkflowDetailsPage>
               snap: true,
               actions: [
                 workflowAsync.when(
-                  data: (workflow) => Switch(value: workflow.active, onChanged: _handleToggle),
+                  data: (workflow) => Switch(
+                    value: _pendingToggleValue ?? workflow.active,
+                    onChanged: _handleToggle,
+                  ),
                   loading: () => const SizedBox.shrink(),
                   error: (_, _) => const SizedBox.shrink(),
                 ),
